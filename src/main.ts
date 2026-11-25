@@ -2,6 +2,14 @@
 import "./styles.css";
 import { archiveCases } from "./content/cases";
 import type { CaseAction, Cost, Profile, Resolution, RunState } from "./game/types";
+import {
+  afterDialogueRender,
+  handleDialogueAction,
+  handleDialogueChange,
+  handleDialogueKeydown,
+  renderDialoguePanel,
+  type DialogueBeat,
+} from "./ui/dialogue";
 import { loadProfiles, saveProfiles, emptyProfile } from "./game/save";
 import {
   applyAction,
@@ -20,6 +28,13 @@ const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("App root element is missing.");
 const appRoot: HTMLDivElement = app;
 const TEXT_SIZE_KEY = "night-shift-archive.text-size.v1";
+const chapterNames = [
+  "The first record",
+  "Rooms out of order",
+  "Before the index closes",
+];
+const campaignComplete = (profile: Profile): boolean =>
+  archiveCases.every((archiveCase) => profile.completedCases.includes(archiveCase.id));
 
 let profiles = loadProfiles();
 let activeProfileId: number | null = null;
@@ -92,19 +107,21 @@ function resourceBar(run: RunState): string {
 function profileScreen(): string {
   const slots = profiles.map((profile) => {
     const occupied = profile.loopCount > 0;
-    const runLabel =
-      profile.run?.scene === "summary"
-        ? "Shift complete — start next"
+    const runLabel = campaignComplete(profile)
+      ? "Replay campaign · memories kept"
+      : profile.run?.scene === "summary"
+        ? "Continue campaign"
         : profile.run
           ? "Continue current shift"
           : occupied
-            ? "Begin next shift"
+            ? "Continue campaign"
             : "Start a new profile";
+    const rememberedMoments = Object.values(profile.npcMemories).reduce((total, count) => total + count, 0);
     return `<article class="profile-card ${occupied ? "" : "empty"}">
       <div>
         <p class="eyebrow">PROFILE ${profile.id}</p>
-        <h2>${occupied ? `Shift ${profile.loopCount}` : "An empty file"}</h2>
-        <p>${occupied ? `${profile.facts.length} lasting ${profile.facts.length === 1 ? "fact" : "facts"} · ${profile.adaMemory + profile.ivoMemory} remembered moments` : "A separate archive history and set of memories."}</p>
+        <h2>${occupied ? `Night ${profile.loopCount}` : "An empty file"}</h2>
+        <p>${occupied ? `${profile.completedCases.length}/${archiveCases.length} files resolved · ${rememberedMoments} remembered moments` : "A separate campaign and memory."}</p>
       </div>
       <button class="button primary" data-action="select-profile" data-id="${profile.id}">${runLabel}</button>
       ${occupied ? `<button class="text-button danger" data-action="reset-profile" data-id="${profile.id}">Reset this profile</button>` : ""}
@@ -115,17 +132,22 @@ function profileScreen(): string {
     <header class="masthead">
       <div class="masthead-utility"><p class="eyebrow">A narrative roguelike prototype</p>${readingControl()}</div>
       <h1>The Night-Shift <em>Archive</em></h1>
-      <p class="intro">Unfinished stories gather here after dark. You have until morning to decide what deserves an ending.</p>
+      <p class="intro">Unfinished stories gather after dark. Decide what the archive should remember.</p>
     </header>
     <section class="profile-list" aria-label="Save profiles">${slots}</section>
-    <p class="footnote">Your discoveries and the people you meet can remember a shift. Time and composure cannot.</p>
+    <p class="footnote">Facts and familiar faces carry forward. Shift resources do not.</p>
     <p class="footnote">Progress is saved in this browser on this site; it does not sync between players or devices.</p>
     <p class="footnote">Your reading-size preference is also saved in this browser.</p>
   </main>`;
 }
 
 function hubScreen(profile: Profile, run: RunState): string {
-  const caseCards = archiveCases.map((archiveCase) => {
+  const chapterCases = archiveCases.filter(
+    (archiveCase) =>
+      archiveCase.chapter === profile.chapter &&
+      !profile.completedCases.includes(archiveCase.id),
+  );
+  const caseCards = chapterCases.map((archiveCase) => {
     const resolved = run.resolvedCases.includes(archiveCase.id);
     const canEnter = run.time >= 2;
     return `<article class="case-card ${resolved ? "resolved" : ""}">
@@ -138,26 +160,28 @@ function hubScreen(profile: Profile, run: RunState): string {
       </button>
     </article>`;
   }).join("");
+  const nextChapter = profile.chapter > chapterNames.length || campaignComplete(profile);
+  const chapterComplete = chapterCases.length === 0 && !campaignComplete(profile);
   return `<main class="screen">
     <header class="topline">
-      <div><p class="eyebrow">PROFILE ${profile.id} · SHIFT ${profile.loopCount}</p><h1>The archive floor</h1></div>
+      <div><p class="eyebrow">PROFILE ${profile.id} · NIGHT ${profile.loopCount} · CHAPTER ${Math.min(profile.chapter, chapterNames.length)}</p><h1>${nextChapter ? "The archive is quiet" : chapterNames[Math.max(0, profile.chapter - 1)]}</h1></div>
       <div class="topline-actions">${readingControl()}<button class="text-button" data-action="profiles">Change profile</button></div>
     </header>
     ${resourceBar(run)}
     <section class="narrative-panel">
-      <p class="eyebrow">12:07 AM · NORTH READING ROOM</p>
-      <p>The desk lamp hums above two folders. The clock has no hands, but the archive knows when morning comes.</p>
+      <p class="eyebrow">${nextChapter ? "CAMPAIGN COMPLETE" : chapterComplete ? "CHAPTER FILED" : "YOUR SHIFT"}</p>
+      <p>${nextChapter ? "Every case has an ending. The index leaves one line open for another night." : chapterComplete ? "The chapter's open cases are filed. Close the shift to enter the next wing." : "Choose the files this shift can afford. Unresolved cases wait for another night."}</p>
       ${profile.facts.length ? `<p class="memory-note"><strong>What you carry:</strong> ${profile.facts.map(escapeHtml).join(" · ")}</p>` : ""}
     </section>
     ${run.outcome ? `<section class="narrative-panel outcome" aria-live="polite"><p class="eyebrow">CASE OUTCOME</p><p>${escapeHtml(run.outcome)}</p></section>` : ""}
-    <details class="guide-panel optional-guide">
-      <summary>How a shift works <span>(optional)</span></summary>
-      <p>Entering a case costs 1 time. The approach matching your planned lead waives 1 time on its investigation action. Social clues cost a Favor and restore 1 Composure when resolved; risky clues cost 2 Composure and return 1 Time. A matching clue enables a resolution, which costs 1 time. Every cost and effect appears before you commit.</p>
-      <p>Time or Composure reaching zero ends the shift. Run resources reset on the next shift; profile facts and NPC familiarity remain.</p>
+    ${profile.loopCount === 1 && profile.completedCases.length === 0 ? `<details class="guide-panel optional-guide">
+      <summary>Shift rules <span>(optional)</span></summary>
+      <p>Plan a lead to make its matching investigation free in Time. Social leads cost a Favor; risky leads cost Composure and return Time. Resolve a clue for 1 Time. At zero Time or Composure, morning ends the shift.</p>
     </details>
-    <section class="case-grid" aria-label="Available cases">${caseCards}</section>
-    ${run.time < 2 && run.resolvedCases.length < archiveCases.length ? `<p class="helper">There is not enough time to enter and resolve another case. End the shift or restart after the summary.</p>` : ""}
-    <div class="actions-row"><button class="button secondary" data-action="end-shift">End shift early</button></div>
+    ` : ""}
+    ${caseCards ? `<section class="case-grid" aria-label="Available cases">${caseCards}</section>` : ""}
+    ${!chapterComplete && !nextChapter && run.time < 2 ? `<p class="helper">Not enough Time to enter and resolve another case tonight.</p>` : ""}
+    <div class="actions-row"><button class="button secondary" data-action="end-shift">${chapterComplete || nextChapter ? "Close shift" : "End shift"}</button></div>
   </main>`;
 }
 
@@ -174,7 +198,7 @@ function planningScreen(profile: Profile, run: RunState): string {
     const socialReward =
       previewResolution?.socialClue === leadAction.clue ? previewResolution.composureReward ?? 0 : 0;
     const memoryEffect = leadAction.memory
-      ? `<small>${leadAction.memory === "ada" ? "Ada" : "Ivo"} remembers this choice across shifts.</small>`
+      ? `<small>${escapeHtml(archiveCase.character)} will remember this choice.</small>`
       : "";
     const socialEffect = socialReward
       ? `<small>The matching resolution restores ${socialReward} Composure (up to 4).</small>`
@@ -199,7 +223,7 @@ function planningScreen(profile: Profile, run: RunState): string {
         <p><strong>Concern:</strong> ${escapeHtml(archiveCase.concern)}</p>
       </div>
     </section>
-    <section class="guide-panel"><p class="eyebrow">PLANNING</p><p>Entering this case cost 1 time. Your chosen lead previews its clue and resolution; the matching investigation action waives 1 time.</p></section>
+    <p class="helper">Entry cost 1 Time. Your matching lead costs no Time to investigate.</p>
     <section class="choice-section"><h2>Choose your approach</h2><div class="choice-list">${approaches}</div></section>
     <button class="button primary wide" data-action="begin-investigation" ${run.approach ? "" : "disabled"}>Begin investigation · no cost</button>
   </main>`;
@@ -209,10 +233,27 @@ function dialogueReaction(
   profile: Profile,
   run: RunState,
   archiveCase: NonNullable<ReturnType<typeof getActiveCase>>,
-): { trigger: string; line: string } {
+): DialogueBeat {
+  const createBeat = (trigger: string, line: string): DialogueBeat => ({
+    key: `${profile.id}:${archiveCase.id}:${trigger}:${line}`,
+    speaker: archiveCase.character,
+    trigger,
+    line,
+    expression: trigger.includes("risky")
+      ? "uneasy"
+      : trigger.includes("Favor")
+        ? "open"
+        : trigger === "Déjà vu"
+          ? "uncanny"
+          : trigger === "The ledger remembers"
+            ? "reflective"
+            : trigger === "After a clue"
+              ? "focused"
+              : "guarded",
+  });
   const socialAction = archiveCase.actions.find((action) => action.memory);
   if (socialAction && run.clues.includes(socialAction.clue)) {
-    return { trigger: "After you spent a Favor", line: archiveCase.dialogue.afterFavor };
+    return createBeat("After you spent a Favor", archiveCase.dialogue.afterFavor);
   }
 
   const hasRiskyClue = archiveCase.actions.some(
@@ -222,17 +263,23 @@ function dialogueReaction(
     (action) => !action.cost.composure && !action.memory && run.clues.includes(action.clue),
   );
   if (hasRiskyClue) {
-    return { trigger: "After a risky clue", line: archiveCase.dialogue.afterRiskyClue };
+    return createBeat("After a risky clue", archiveCase.dialogue.afterRiskyClue);
   }
   if (hasNonRiskyClue) {
-    return { trigger: "After a clue", line: archiveCase.dialogue.afterNonRiskyClue };
+    return createBeat("After a clue", archiveCase.dialogue.afterNonRiskyClue);
   }
 
-  const familiarity = archiveCase.id === "bell" ? profile.adaMemory : profile.ivoMemory;
-  if (profile.loopCount >= 2 && familiarity > 0) {
-    return { trigger: "Déjà vu", line: archiveCase.dialogue.dejaVu };
+  const priorFactReaction = archiveCase.priorFactReactions?.find((reaction) =>
+    profile.facts.includes(reaction.fact),
+  );
+  if (priorFactReaction) {
+    return createBeat("The ledger remembers", priorFactReaction.line);
   }
-  return { trigger: "First meeting", line: archiveCase.dialogue.firstMeeting };
+
+  if (profile.loopCount >= 2 && profile.npcMemories[archiveCase.characterId] > 0) {
+    return createBeat("Déjà vu", archiveCase.dialogue.dejaVu);
+  }
+  return createBeat("First meeting", archiveCase.dialogue.firstMeeting);
 }
 
 function actionButton(action: CaseAction, run: RunState): string {
@@ -245,8 +292,9 @@ function actionButton(action: CaseAction, run: RunState): string {
     timeAfterAction < 1
       ? `<small class="cost-warning">Warning: this leaves 0 time, so you cannot resolve the case afterward.</small>`
       : "";
+  const archiveCase = getActiveCase(run);
   const memoryEffect = action.memory
-    ? `<small>${action.memory === "ada" ? "Ada" : "Ivo"} will remember your help across shifts.</small>`
+    ? `<small>${escapeHtml(archiveCase?.character ?? "They")} will remember this.</small>`
     : "";
   return `<button class="choice-button" data-action="investigate" data-id="${action.id}" ${known || !affordable ? "disabled" : ""}>
     <strong>${escapeHtml(action.label)} ${known ? "· clue found" : ""}</strong>
@@ -291,8 +339,8 @@ function investigationScreen(profile: Profile, run: RunState): string {
     .join("");
   const hasCaseClue = run.clues.some((clue) => clue.startsWith(`${archiveCase.id}:`));
   const clueStatus = hasCaseClue
-    ? "Clue found. A matching resolution is available below."
-    : "No clue found yet. Your planned lead costs no Time; other actions show their costs and effects.";
+    ? "Clue found. Choose an ending."
+    : "Choose a lead to uncover a clue.";
   return `<main class="screen">
     <div class="screen-toolbar"><button class="text-button back" data-action="back-hub">← Leave case</button>${readingControl()}</div>
     ${resourceBar(run)}
@@ -300,17 +348,16 @@ function investigationScreen(profile: Profile, run: RunState): string {
       <p class="eyebrow">INVESTIGATION · ${archiveCase.character.toUpperCase()}</p>
       <h1>${archiveCase.title}</h1>
       ${approach}
-      <div class="character-note">
+      <div class="character-note character-context">
         <strong>${archiveCase.character} · ${archiveCase.role}</strong>
-        <p class="dialogue-trigger">${dialogue.trigger}</p>
-        <p class="dialogue-line" aria-live="polite">“${escapeHtml(dialogue.line)}”</p>
         <p class="character-context"><strong>Need:</strong> ${escapeHtml(archiveCase.need)} <strong>Concern:</strong> ${escapeHtml(archiveCase.concern)}</p>
       </div>
+      ${renderDialoguePanel(dialogue, profile.id)}
       ${clues ? `<div class="clue-list" aria-label="Discovered clues">${clues}</div>` : `<p class="helper">No clues discovered yet.</p>`}
     </section>
     <p class="helper" aria-live="polite">${clueStatus}</p>
     <section class="choice-section"><h2>Investigate or talk</h2><div class="choice-list">${actions}</div></section>
-    <section class="choice-section"><h2>Resolve the case</h2><p class="helper">A resolution costs one time and needs the clue shown on its option.</p><div class="choice-list">${resolutions}</div></section>
+    <section class="choice-section"><h2>Resolve</h2><p class="helper">A clue and 1 Time are required.</p><div class="choice-list">${resolutions}</div></section>
   </main>`;
 }
 
@@ -323,10 +370,29 @@ function summaryScreen(profile: Profile, run: RunState): string {
   const failed =
     run.endReason?.startsWith("Your composure") ||
     run.endReason?.startsWith("Morning reaches");
+  const complete = campaignComplete(profile);
+  const wroteFinalEntry = run.history.some((entry) => entry.includes("Write your own unfinished entry"));
+  const campaignEnding = wroteFinalEntry
+    ? {
+        title: "The index knows your name.",
+        text: "Your unfinished entry remains in the archive by choice. The next reader can decide what to do with it.",
+      }
+    : {
+        title: "The index stays open.",
+        text: "You have filed every case and left the final line open for another reader.",
+      };
+  const finishedChapterCases = archiveCases.filter((archiveCase) => archiveCase.chapter === profile.chapter);
+  const chapterFiled =
+    finishedChapterCases.length > 0 &&
+    finishedChapterCases.every((archiveCase) => profile.completedCases.includes(archiveCase.id));
+  const nextChapter = chapterFiled ? profile.chapter + 1 : profile.chapter;
+  const remembered = Object.entries(profile.npcMemories)
+    .filter(([, count]) => count > 0)
+    .map(([name, count]) => `${name[0].toUpperCase()}${name.slice(1)} ×${count}`);
   return `<main class="screen summary-screen">
     <div class="summary-toolbar"><p class="eyebrow">SHIFT ${profile.loopCount} · SUMMARY</p>${readingControl()}</div>
-    <h1>Morning has arrived.</h1>
-    <p class="intro">${escapeHtml(run.endReason ?? "You leave the archive as the night gives way.")}</p>
+    <h1>${complete ? campaignEnding.title : "Morning has arrived."}</h1>
+    <p class="intro">${complete ? campaignEnding.text : escapeHtml(run.endReason ?? "The shift is over.")}</p>
     ${resourceBar(run)}
     ${run.outcome ? `<section class="narrative-panel outcome"><p class="eyebrow">LAST CASE</p><p>${escapeHtml(run.outcome)}</p></section>` : ""}
     <section class="summary-card">
@@ -339,11 +405,11 @@ function summaryScreen(profile: Profile, run: RunState): string {
       ${history ? `<ol>${history}</ol>` : "<p>No actions were recorded.</p>"}
     </section>
     <section class="summary-card">
-      <h2>What carries forward</h2>
+      <h2>Campaign record</h2>
       ${facts ? `<ul>${facts}</ul>` : "<p>No lasting facts discovered yet.</p>"}
-      <p>Ada remembers ${profile.adaMemory} moment${profile.adaMemory === 1 ? "" : "s"}; Ivo remembers ${profile.ivoMemory} moment${profile.ivoMemory === 1 ? "" : "s"}.</p>
+      <p>${profile.completedCases.length}/${archiveCases.length} cases filed · ${remembered.length ? escapeHtml(remembered.join(" · ")) : "No NPC memories yet."}</p>
     </section>
-    <button class="button primary wide" data-action="next-shift">${failed ? "Restart shift" : "Begin the next shift"}</button>
+    <button class="button primary wide" data-action="${complete ? "replay-campaign" : "next-shift"}">${complete ? "Replay campaign · keep memories" : failed ? "Restart shift" : `Continue to chapter ${Math.min(nextChapter, chapterNames.length)}`}</button>
     <button class="text-button centered" data-action="profiles">Return to profiles</button>
   </main>`;
 }
@@ -353,6 +419,7 @@ function render(): void {
   const profile = selectedProfile();
   if (!profile || !profile.run) {
     appRoot.innerHTML = profileScreen();
+    afterDialogueRender(false);
     return;
   }
   const run = profile.run;
@@ -370,9 +437,17 @@ function render(): void {
       appRoot.innerHTML = summaryScreen(profile, run);
       break;
   }
+  afterDialogueRender(run.scene === "investigation");
 }
 
 function startShift(profile: Profile, isFirstShift: boolean): void {
+  const currentChapterCases = archiveCases.filter((archiveCase) => archiveCase.chapter === profile.chapter);
+  if (
+    currentChapterCases.length > 0 &&
+    currentChapterCases.every((archiveCase) => profile.completedCases.includes(archiveCase.id))
+  ) {
+    profile.chapter += 1;
+  }
   if (isFirstShift) profile.loopCount = 1;
   else profile.loopCount += 1;
   profile.run = newRun();
@@ -393,6 +468,9 @@ function closeCase(profile: Profile, run: RunState, resolution: Resolution): voi
     run.composure += restoredComposure;
   }
   run.resolvedCases.push(archiveCase.id);
+  if (!profile.completedCases.includes(archiveCase.id)) {
+    profile.completedCases.push(archiveCase.id);
+  }
   run.outcome = resolution.outcome;
   run.history.push(`Resolved ${archiveCase.title}: ${resolution.label}.`);
   if (restoredComposure > 0) {
@@ -415,6 +493,7 @@ app.addEventListener("click", (event) => {
   const id = Number(button.dataset.id);
   const profile = selectedProfile();
 
+  if (handleDialogueAction(action, button.dataset.id, render)) return;
   if (action === "toggle-reading") {
     largeText = !largeText;
     try {
@@ -435,7 +514,9 @@ app.addEventListener("click", (event) => {
     const selected = profiles.find((item) => item.id === id);
     if (!selected) return;
     activeProfileId = selected.id;
-    if (!selected.run || selected.run.scene === "summary") {
+    if (selected.run?.scene === "summary" && campaignComplete(selected)) {
+      render();
+    } else if (!selected.run || selected.run.scene === "summary") {
       startShift(selected, selected.loopCount === 0);
     } else {
       render();
@@ -455,9 +536,19 @@ app.addEventListener("click", (event) => {
 
   if (action === "next-shift") {
     startShift(profile, false);
+  } else if (action === "replay-campaign") {
+    profile.chapter = 1;
+    profile.completedCases = [];
+    startShift(profile, false);
   } else if (action === "open-case") {
     const archiveCase = archiveCases.find((item) => item.id === button.dataset.id);
-    if (!archiveCase || run.resolvedCases.includes(archiveCase.id) || run.time < 2) return;
+    if (
+      !archiveCase ||
+      archiveCase.chapter !== profile.chapter ||
+      profile.completedCases.includes(archiveCase.id) ||
+      run.resolvedCases.includes(archiveCase.id) ||
+      run.time < 2
+    ) return;
     payCost(run, { time: 1 });
     run.history.push(`Entered ${archiveCase.title}.`);
     run.activeCaseId = archiveCase.id;
@@ -506,6 +597,18 @@ app.addEventListener("click", (event) => {
     persist();
     render();
   }
+});
+
+appRoot.addEventListener("change", (event) => {
+  handleDialogueChange(event.target, render);
+});
+
+document.addEventListener("keydown", (event) => {
+  handleDialogueKeydown(
+    event,
+    selectedProfile()?.run?.scene === "investigation",
+    render,
+  );
 });
 
 render();

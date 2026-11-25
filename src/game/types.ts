@@ -1,4 +1,5 @@
 export type Scene = "hub" | "planning" | "investigation" | "summary";
+export type NpcId = "ada" | "ivo" | "nera" | "tovin" | "mara" | "eren";
 
 export interface RunState {
   scene: Scene;
@@ -17,9 +18,10 @@ export interface RunState {
 export interface Profile {
   id: number;
   loopCount: number;
+  chapter: number;
+  completedCases: string[];
   facts: string[];
-  adaMemory: number;
-  ivoMemory: number;
+  npcMemories: Record<string, number>;
   run: RunState | null;
 }
 
@@ -35,7 +37,7 @@ export interface CaseAction {
   description: string;
   cost: Cost;
   clue: string;
-  memory?: "ada" | "ivo";
+  memory?: NpcId;
   timeRefund?: number;
 }
 

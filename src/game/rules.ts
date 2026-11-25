@@ -49,6 +49,10 @@ export function hasClue(run: RunState, clue: string): boolean {
     "bell:echo": ["bell:echo"],
     "voice:script": ["voice:script", "voice:cadence"],
     "voice:echo": ["voice:echo"],
+    "address:stamp": ["address:stamp", "address:promise"],
+    "shelf:dust": ["shelf:dust", "shelf:route"],
+    "lamp:ledger": ["lamp:ledger", "lamp:memory"],
+    "index:blank": ["index:blank", "index:choice"],
   };
   return (relatedClues[clue] ?? [clue]).some((item) => run.clues.includes(item));
 }
@@ -61,8 +65,9 @@ export function applyAction(profile: Profile, run: RunState, action: CaseAction)
   payCost(run, getActionCost(run, action));
   run.time = Math.min(5, run.time + (action.timeRefund ?? 0));
   if (!run.clues.includes(action.clue)) run.clues.push(action.clue);
-  if (action.memory === "ada") profile.adaMemory += 1;
-  if (action.memory === "ivo") profile.ivoMemory += 1;
+  if (action.memory) {
+    profile.npcMemories[action.memory] = (profile.npcMemories[action.memory] ?? 0) + 1;
+  }
 }
 
 export function finishShift(run: RunState, reason: string): void {
