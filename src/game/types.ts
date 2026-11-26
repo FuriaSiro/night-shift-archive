@@ -21,6 +21,7 @@ export interface Profile {
   chapter: number;
   completedCases: string[];
   facts: string[];
+  currentFacts: string[];
   npcMemories: Record<string, number>;
   run: RunState | null;
 }

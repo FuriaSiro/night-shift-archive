@@ -36,14 +36,12 @@ export const archiveCases: ArchiveCase[] = [
     need: "To know the story can end without erasing what mattered.",
     concern: "That the bell is calling someone who will never arrive.",
     dialogue: {
-      firstMeeting: "You're new to the margins. Good—maybe you'll hear the bell and not run.",
+      firstMeeting: "Before we decide what the bell means, show me what the ink actually says.",
       afterNonRiskyClue:
-        "So the case had an ending all along.{pause:300} That's the *cruel* part—it just didn't get to say so.",
-      afterFavor: "You spent a favor on me? People usually spend them to get away.",
-      dejaVu:
-        "Wait—you asked me about the bell before. Didn't you? I remember your voice, not the words.",
-      afterRiskyClue:
-        "The bell has answered. Let's let the echo settle before we decide what it means.",
+        "One mark repeats. That's evidence; its meaning is still ours to choose.",
+      afterFavor: "You spent a favor to ask what I fear. Plainly? I don't want the bell mistaken for a promise.",
+      dejaVu: "We've stood here before—or I've filed this moment too carefully. The bell hasn't changed its mind.",
+      afterRiskyClue: "The echo is real. Its meaning isn't proven. I'll record both facts.",
     },
     approaches: [
       { label: "Study the ink", actionId: "ink" },
@@ -110,11 +108,11 @@ export const archiveCases: ArchiveCase[] = [
     need: "To protect the voices entrusted to the archive.",
     concern: "That listening closely will make the recording take another voice.",
     dialogue: {
-      firstMeeting: "Keep your voice down near the reels. They're learning how to keep things.",
-      afterNonRiskyClue: "That clue doesn't bite. The ones that do are still wound tight.",
-      afterFavor: "A favor, for me? You must want something the archive won't give freely.",
-      dejaVu: "{color:#e0b36f}Your voice{/color}—it's already on a reel. That's not possible. Is it?",
-      afterRiskyClue: "That's enough of the reel for now. I can still hear it settling.",
+      firstMeeting: "This reel is dated tomorrow. I've stopped asking which side of today it belongs to.",
+      afterNonRiskyClue: "The label matches a voice that hasn't visited. I can't tell if that's memory or warning.",
+      afterFavor: "You spent a favor to hear what I'd keep quiet: these voices deserve a choice.",
+      dejaVu: "Your voice feels familiar before you speak. I dislike how often that's been true.",
+      afterRiskyClue: "That wasn't your voice on the reel. Not yet, at least. Please don't ask me what I mean.",
     },
     approaches: [
       { label: "Read the label", actionId: "label" },
@@ -180,11 +178,11 @@ export const archiveCases: ArchiveCase[] = [
     need: "To preserve the message without choosing who it belongs to.",
     concern: "That leaving it unread is another way of abandoning its writer.",
     dialogue: {
-      firstMeeting: "The paper is older than the ink. I don't know which part to trust.",
-      afterNonRiskyClue: "The stamp points here, not to a person. That may be enough.",
-      afterFavor: "You spent a favor to ask what I won't open. Thank you for not opening it.",
-      dejaVu: "I remember your hands near the envelope. You waited last time, too.",
-      afterRiskyClue: "The seal is broken. We can still choose not to read the words.",
+      firstMeeting: "A letter can arrive without naming its reader. Perhaps the blank space belongs to it.",
+      afterNonRiskyClue: "The stamp points to the archive, not a person. We can stop at what we know.",
+      afterFavor: "You spent a favor to ask what I won't open. Thank you for leaving the choice with me.",
+      dejaVu: "I remember you waiting by the seal. Have we already made this choice?",
+      afterRiskyClue: "The paper gave way easily. That doesn't mean the message was meant for us.",
     },
     priorFactReactions: [
       {
@@ -266,11 +264,11 @@ export const archiveCases: ArchiveCase[] = [
     need: "To map a place that refuses to stay put.",
     concern: "That a correct map will make the shelf vanish for good.",
     dialogue: {
-      firstMeeting: "Don't follow the shelf. Follow what the dust remembers.",
-      afterNonRiskyClue: "Same dust, different room. The map can admit it moved.",
-      afterFavor: "You let me choose the route. Most people want a straight answer.",
-      dejaVu: "You came back to the dust marks. I marked them for you this time.",
-      afterRiskyClue: "It moved while we watched. I can still draw where it was.",
+      firstMeeting: "If the shelf moves, don't chase it. Mark the room it leaves behind.",
+      afterNonRiskyClue: "Three rooms, one dust mark. The map needn't choose which room is real.",
+      afterFavor: "You spent a favor to let me set the route. I'll take the long way; it tells us more.",
+      dejaVu: "Back again. This time the dust moved before the shelf did.",
+      afterRiskyClue: "The footsteps pass the stacks. I'll mark where they end, not guess what lies beyond.",
     },
     priorFactReactions: [
       {
@@ -291,8 +289,8 @@ export const archiveCases: ArchiveCase[] = [
       {
         id: "dust-map",
         label: "Map the dust marks",
-        description: "Compare the shelf's footprint across rooms.",
-        cost: { time: 1 },
+        description: "Compare the shelf's footprint across rooms; checking all three takes time.",
+        cost: { time: 2 },
         clue: "shelf:dust",
       },
       {
@@ -344,11 +342,11 @@ export const archiveCases: ArchiveCase[] = [
     need: "To let the forgotten book be read before it is filed.",
     concern: "That keeping it open will keep the night from ending.",
     dialogue: {
-      firstMeeting: "I can turn the lamp off. I can't make the empty desk feel empty.",
-      afterNonRiskyClue: "Someone kept this place warm. The ledger doesn't say who.",
-      afterFavor: "You asked what I miss, not what the rules allow. That's rare here.",
-      dejaVu: "You left the lamp on before. I thought I was the only one who noticed.",
-      afterRiskyClue: "The wick flared when you opened it. Let's not mistake that for an answer.",
+      firstMeeting: "The lamp's in the wrong place. I keep moving it back.",
+      afterNonRiskyClue: "The ledger says it was lit for someone. It doesn't say they arrived.",
+      afterFavor: "You spent a favor to ask what I miss. The quiet before opening bell.",
+      dejaVu: "You noticed the lamp last time. I hoped I'd imagined that.",
+      afterRiskyClue: "The page caught the light like it knew you. I'll call it reflection until I know better.",
     },
     priorFactReactions: [
       {

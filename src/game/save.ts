@@ -33,8 +33,13 @@ function readRun(value: unknown): RunState | null {
     history: Array.isArray(value.history)
       ? value.history.filter((item): item is string => typeof item === "string")
       : [],
-    resolvedCases: value.resolvedCases.filter((item): item is string => typeof item === "string"),
-    activeCaseId: typeof value.activeCaseId === "string" ? value.activeCaseId : null,
+    resolvedCases: [...new Set(
+      value.resolvedCases.filter((item): item is string => typeof item === "string" && caseIds.has(item)),
+    )],
+    activeCaseId:
+      typeof value.activeCaseId === "string" && caseIds.has(value.activeCaseId)
+        ? value.activeCaseId
+        : null,
     approach: typeof value.approach === "string" ? value.approach : null,
     clues: value.clues.filter((item): item is string => typeof item === "string"),
     outcome: typeof value.outcome === "string" ? value.outcome : null,
@@ -63,9 +68,12 @@ function readProfile(value: unknown, id: number): Profile {
     npcMemories.ivo = Math.max(0, Math.floor(value.ivoMemory));
   }
   const facts = Array.isArray(value.facts)
-    ? value.facts.filter((item): item is string => typeof item === "string")
+    ? [...new Set(value.facts.filter((item): item is string => typeof item === "string"))]
     : [];
-  const savedRun = readRun(value.run);
+  const savedCurrentFacts = Array.isArray(value.currentFacts)
+    ? [...new Set(value.currentFacts.filter((item): item is string => typeof item === "string"))]
+    : facts;
+  let savedRun = readRun(value.run);
   const completedCases = Array.isArray(value.completedCases)
     ? [...new Set(value.completedCases.filter((item): item is string => typeof item === "string" && caseIds.has(item)))]
     : archiveCases
@@ -74,6 +82,25 @@ function readProfile(value: unknown, id: number): Profile {
           archiveCase.resolutions.some((resolution) => facts.includes(resolution.fact)),
         )
         .map((archiveCase) => archiveCase.id);
+  if (
+    savedRun?.activeCaseId &&
+    savedRun.resolvedCases.includes(savedRun.activeCaseId) &&
+    !completedCases.includes(savedRun.activeCaseId)
+  ) {
+    completedCases.push(savedRun.activeCaseId);
+  }
+  if (
+    savedRun &&
+    ((savedRun.scene === "planning" || savedRun.scene === "investigation") &&
+      (!savedRun.activeCaseId || completedCases.includes(savedRun.activeCaseId)))
+  ) {
+    savedRun = {
+      ...savedRun,
+      scene: "hub",
+      activeCaseId: null,
+      approach: null,
+    };
+  }
   let migratedChapter = 1;
   while (migratedChapter <= Math.max(...archiveCases.map((archiveCase) => archiveCase.chapter))) {
     const chapterCases = archiveCases.filter((archiveCase) => archiveCase.chapter === migratedChapter);
@@ -92,6 +119,7 @@ function readProfile(value: unknown, id: number): Profile {
         : migratedChapter,
     completedCases,
     facts,
+    currentFacts: savedCurrentFacts,
     npcMemories,
     run: savedRun,
   };
@@ -104,6 +132,7 @@ export function emptyProfile(id: number): Profile {
     chapter: 1,
     completedCases: [],
     facts: [],
+    currentFacts: [],
     npcMemories: {},
     run: null,
   };
@@ -128,6 +157,12 @@ export function loadProfiles(): Profile[] {
   }
 }
 
-export function saveProfiles(profiles: Profile[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+export function saveProfiles(profiles: Profile[]): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+    return true;
+  } catch (error) {
+    console.error("Could not save archive progress in this browser.", error);
+    return false;
+  }
 }

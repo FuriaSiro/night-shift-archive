@@ -6,7 +6,7 @@ export function newRun(): RunState {
     scene: "hub",
     time: 5,
     composure: 4,
-    favors: 2,
+    favors: 1,
     history: [],
     resolvedCases: [],
     activeCaseId: null,

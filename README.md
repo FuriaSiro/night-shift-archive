@@ -2,16 +2,24 @@
 
 A single-player narrative roguelike about filing unfinished stories across a sequence of night shifts. It is a static Vite + TypeScript site: no backend, account system, runtime AI, or paid game content.
 
-## What is in V1.6
+## What is in V1.10
 
 - Three independent browser profiles and a six-case campaign across three chapters.
 - Four new cases and NPCs follow Ada and Ivo's opening chapter.
 - Case planning, clue-based resolutions, and authored alternative outcomes.
 - Time, Composure, and Favors with visible costs; zero Time or Composure ends a shift.
 - Chapter progress and resolved cases persist. Shift resources reset; facts and NPC familiarity carry forward.
-- Earlier case outcomes can change later NPC dialogue; replay keeps memories and can expose other endings.
+- Each shift starts with 1 Favor, making the social approach a limited choice across two cases.
+- One safe lead in “The Shelf That Moved” takes longer, making its plan meaningfully different from social and risky leads.
+- Prior-file reactions appear as persistent margin notes and follow the newest relevant fact.
+- Campaign replay clears current-campaign facts for later reactions while preserving the profile archive and NPC memories.
+- Leaving an unfinished case refunds its 1-Time entry cost. Legacy saves are normalized to prevent reopening completed cases.
+- Earlier case outcomes can change later NPC dialogue; replay keeps profile memories and can expose other endings.
+- Ada, Ivo, Nera, Tovin, and Mara have refreshed, concise dialogue for the existing deterministic triggers.
 - Responsive layouts, keyboard focus, reduced-motion support, and a saved larger-text preference.
 - Dialogue has a typewriter, optional quiet SFX, speed controls, auto-focus, history, and backstep.
+- The visual system uses local font fallbacks, CSS-only archive details, and subtle chapter color shifts.
+- The hub includes a campaign map for chapter locks, filed cases, open-case navigation, and endings found across replays.
 
 The campaign is **designed toward** a 45–60 minute first playthrough when players read the case scenes and try different leads. That duration has not been established by timed player tests; measure it with friends before advertising it as a one-hour game.
 
@@ -21,7 +29,31 @@ The campaign is **designed toward** a 45–60 minute first playthrough when play
 | 2 · Rooms out of order | The Return Address · The Shelf That Moved |
 | 3 · Before the index closes | The Last Lamp · The Morning Index |
 
-Each approach previews a matching lead that waives its 1-Time investigation cost. Social leads cost 1 Favor and build NPC familiarity; resolving their matching clue restores 1 Composure (up to 4). Risky leads cost 2 Composure and return 1 Time. A case becomes a lasting campaign record only after it is resolved. Some later characters react to those exact recorded outcomes. If a shift ends early, unfinished cases return next shift. Replaying the campaign resets case completion but retains profile facts and NPC memories.
+## V1.10 fairness, replay, and assets
+
+The campaign map shows all six cases, chapter progress, and which authored endings each profile has found across replays. Links jump to open case cards without starting them or spending Time. Cases in an open chapter can be pursued in either order; replaying a completed campaign is how you revisit decisions and find other endings.
+
+Gameplay outcomes are deterministic: there are no random combat results, stat-check unlocks, XP grind, or filler encounters. Clues, costs, and failure thresholds are shown before choices. The only randomness is pitch variation in optional dialogue SFX; it has no effect on a run. Repeated dialogue beats display instantly within the current profile's session, and the transcript/backstep remain available for rereading.
+
+No external assets or runtime asset APIs were added. If placeholder art or audio is added later, download only selected assets, check the current license for each individual item, and record its creator, source, license, and required attribution. Candidate libraries include [Kenney](https://kenney.nl/assets), [OpenGameArt](https://opengameart.org/), [Game-icons](https://game-icons.net/), [itch.io game assets](https://itch.io/game-assets/free), and [Freesound](https://freesound.org/). For music, check the per-track terms at [Free Music Archive](https://freemusicarchive.org/) or [Incompetech](https://incompetech.com/music/royalty-free/). Terms vary by asset and can change. Keep assets self-hosted so the prototype does not depend on API keys, rate limits, or third-party availability.
+
+## V1.9 visual direction
+
+The interface follows the Canva direction sheet's ink-blue and charcoal surfaces, warm paper, and restrained brass. Each chapter changes only the ambient glow and small index accents, keeping resource and choice meanings consistent. Catalog rules, paper edges, lined marginalia, and the title-screen sound-wave rings are CSS decorations; the paper texture stays low-contrast behind HTML text.
+
+Typography uses two local-first pairings: Segoe UI / Trebuchet MS / Arial for interface text, and Palatino Linotype / Book Antiqua / Georgia for headings and dialogue. Index labels use Cascadia Mono / Consolas. No remote fonts, generated artwork, or image text are required.
+
+On narrow screens, case cards stack, choice buttons remain full-width with larger touch targets, and dialogue controls wrap rather than forcing horizontal scrolling. The motifs are decorative only; text, costs, focus indicators, and reduced-motion behavior remain in the regular HTML/CSS interface.
+
+## V1.8 NPC voice update
+
+Five existing NPCs have new authored lines for first meetings, discovered clues, spent Favors, risky clues, and remembered loops. Their voices use broad literary character archetypes as a creative springboard—careful observer, out-of-step witness, patient conservator, uncertain cartographer, and watchful keeper—while remaining original people in the archive. No borrowed character names, canon histories, signature phrases, costs, clues, or game states were added. Eren's existing lines and all gameplay rules remain unchanged.
+
+Each approach previews a matching lead that reduces its Time cost by 1. Most matching leads become free in Time; the safe map lead in “The Shelf That Moved” still costs 1 Time after planning. Each shift starts with 1 Favor, so social leads cannot be used on both cases in the same shift. They build NPC familiarity, and resolving their matching clue restores 1 Composure (up to 4). Risky leads cost 2 Composure and return 1 Time. A risky action that leaves 0 Composure ends the shift before resolution; its cost warning makes this consequence visible. Leaving an unfinished case refunds the 1-Time entry cost, while any investigation costs already spent remain spent.
+
+Resolved case facts remain in the profile's full archive. The current campaign's facts separately drive prior-file reactions; replay clears that working set while preserving the full archive and NPC memories. When more than one earlier fact could affect a case, the newest matching fact takes precedence.
+
+On an older save without the `currentFacts` field, the saved facts are used as the current campaign's facts until the player replays the campaign.
 
 Saves use `localStorage` and are local to this browser and site origin; they do not sync between friends, devices, or `localhost` and the deployed site.
 
@@ -55,13 +87,13 @@ Controls and markup are intentionally small: dialogue remains authored and deter
 
 ### Quick campaign playtest path
 
-1. Start Profile 1 and resolve both opening cases with the planned matching leads.
-2. Close the shift. Resolve a case in Chapter 2 and notice the other NPC's line refers to the fact you just filed.
+1. Start Profile 1 and choose which opening case should get the single social Favor.
+2. Resolve a case in Chapter 2 and notice its margin note reflects the newest relevant fact you filed.
 3. Finish the current chapter, then verify the next opens on the following shift.
 4. Finish all six cases; the summary should offer a campaign replay that keeps memories.
-5. Replay and choose different case endings. Check that later dialogue follows the newly recorded fact, not a random roll.
+5. Replay and choose different case endings. Confirm the new campaign's margin notes follow only its current facts; the profile archive should still retain past facts.
 
-The visual treatment uses the Canva moodboard as an abstract guide: ink-blue surfaces, warm paper case/profile cards, restrained brass accents, and CSS-only catalog details. No generated image is required. NPC lines are selected from authored content using current clues, Favor actions, and profile memory; no dialogue is generated at runtime. The optional reading-size control is saved in this browser independently of the three game profiles.
+NPC lines are selected from authored content using current clues, Favor actions, and profile memory; no dialogue is generated at runtime. The optional reading-size control is saved in this browser independently of the three game profiles.
 
 ## V1 design guardrails
 
@@ -95,13 +127,15 @@ In Gemini, paste this prompt and attach or paste the current `src/content/cases.
 Act as a progression designer reviewing my original browser game, The Night-Shift Archive. This is a V2 review of the CURRENT workspace, not the old two-case prototype. Inspect the source I provide before making claims.
 
 CURRENT SHAPE
-- Six authored cases across three chapters. Each shift starts with 5 Time, 4 Composure, and 2 Favors.
-- Entering a case costs 1 Time. Planning its matching lead waives that lead's 1-Time cost.
+- Six authored cases across three chapters. Each shift starts with 5 Time, 4 Composure, and 1 Favor.
+- Entering a case costs 1 Time. Planning its matching lead reduces its Time cost by 1; the safe lead in `moving-shelf` starts at 2 Time and still costs 1 Time after planning.
 - Social leads spend 1 Favor and persist NPC familiarity; their matching resolution restores up to 1 Composure.
 - Risky leads spend 2 Composure and return 1 Time when they reveal a clue.
 - A resolution requires its clue and 1 Time. Zero Time or Composure ends the shift.
-- Resolved cases and chapters persist; run resources reset. Facts and NPC memories persist per profile.
-- Replay resets campaign case completion but keeps memories, enabling deterministic changed dialogue.
+- Leaving an unfinished case refunds its 1-Time entry cost; investigation costs remain spent.
+- Resolved cases and chapters persist; run resources reset. Profile facts and NPC memories persist.
+- Current-campaign facts drive prior-file margin notes. Replay clears those active facts but keeps the full profile archive and NPC memories.
+- Prior-file notes are separate from post-clue dialogue; the newest matching fact takes precedence.
 - Specific earlier case endings change later NPC lines; they are authored fact-to-line links, not random reactions.
 - UI should be concise: costs, clues, and consequences must be clear without repeating tutorial paragraphs.
 
@@ -109,7 +143,7 @@ TASK
 1. Trace the actual campaign progression and list any dead ends, unreachable cases, or save/migration risks you can prove from the source.
 2. Assess whether the current case loops offer distinct choices and meaningful replay. Cite the case/action IDs you inspected.
 3. Give at most five small improvements, ranked by player impact. Include one idea to make this archive's gameplay identity more distinctive without imitating another game.
-4. Check whether prior-file reactions actually reflect `Profile.facts` and suggest one safe way to make a later case consequence matter mechanically, without adding a resource.
+4. Check whether prior-file reactions use current-campaign facts rather than the full archive and suggest one safe way to make a later case consequence matter mechanically, without adding a resource.
 5. Propose a 5-player timing/playtest plan for checking the intended 45–60 minute first-campaign target. Do not claim the duration is verified from code.
 6. Flag repeated or unnecessary interface wording with exact phrases to shorten.
 
@@ -177,7 +211,7 @@ Copy this small table into your own notes (or add reviewed decisions below). AI 
 
 After you collect V2 output, paste only the accepted idea into Copilot's implementation prompt below. Do not ask Copilot to implement an entire unreviewed AI response.
 
-## Recommended V1.5 workflow
+## Recommended AI-helper workflow
 
 Work in this order so each tool has a small, clear job:
 
@@ -200,15 +234,16 @@ DESIGN GOAL
 Make the first shift easy to understand, short, replayable, and tense without grind, daily rewards, accounts, battle passes, or filler. Players should make meaningful choices, understand costs before selecting them, and see why a shift ended.
 
 CURRENT RULES TO VERIFY AGAINST THE SOURCE
-- One shift starts with 5 Time, 4 Composure, and 2 Favors.
+- One shift starts with 5 Time, 4 Composure, and 1 Favor.
 - Entering a case costs 1 Time.
-- The investigation action matching the selected approach waives its 1-Time cost. Other actions cost 1 Time.
+- The investigation action matching the selected approach reduces its Time cost by 1. The safe `dust-map` action starts at 2 Time and costs 1 after planning.
 - Social actions also cost 1 Favor, increment NPC familiarity, and their matching resolution restores 1 Composure (up to 4).
 - Risky actions cost 2 Composure and return 1 Time after revealing a clue.
+- Leaving an unfinished case refunds its 1-Time entry cost.
 - Resolving a case costs 1 Time and requires a related clue.
 - A shift ends when Time or Composure reaches zero.
 - The opening chapter has Ada's “The Bell in the Margin” and Ivo's “The Borrowed Voice”; four later cases unlock in chapters two and three.
-- Profile facts and NPC familiarity may persist; run resources and case progress reset on restart.
+- The full profile fact archive and NPC familiarity persist; current-campaign facts reset on replay, while run resources reset each shift.
 
 TASK
 1. Summarize the current first-shift path in 5 steps or fewer.
@@ -248,7 +283,7 @@ CHARACTERS
 GAME RULES
 - The player has limited Time, Composure, and Favors.
 - Clues and player choices are authored and deterministic.
-- The planned approach matches one lead action; that action waives its 1-Time cost. Other actions show their full costs.
+- The planned approach matches one lead action and reduces its Time cost by 1. Other actions show their full costs.
 - A social clue costs 1 Favor, builds persistent NPC familiarity, and restores 1 Composure (up to 4) when its matching resolution is selected.
 - A risky clue costs 2 Composure and returns 1 Time after the clue is found.
 - Resolutions cost 1 Time and require a related clue.
@@ -294,7 +329,7 @@ The existing game must remain readable and usable without any generated image as
 
 Export only assets you actually use. Prefer a small compressed image or CSS treatment; keep text, buttons, focus states, and resource values as accessible HTML/CSS.
 
-The current V1.5 applies this direction with CSS colors, paper-like cards, catalog accents, and the Time pips. Keep any future assets decorative and optional so the interface remains legible without them.
+The current V1.8 applies this direction with CSS colors, paper-like cards, catalog accents, the Time pips, ledger margin notes, and more distinct authored NPC voices. Keep any future assets decorative and optional so the interface remains legible without them.
 
 ### 4. Ask Copilot to implement one approved improvement
 
@@ -303,7 +338,7 @@ In Copilot Chat, attach the relevant files and paste this prompt. Replace the br
 ```text
 Inspect the existing Night-Shift Archive workspace and the attached files before editing.
 
-Implement only this V1.6 change:
+Implement only this V1.8 change:
 [Describe one small, testable change.]
 
 Constraints:
