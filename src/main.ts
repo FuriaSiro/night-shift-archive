@@ -10,10 +10,27 @@ import {
   renderDialoguePanel,
   type DialogueBeat,
 } from "./ui/dialogue";
-import { loadProfiles, saveProfiles, emptyProfile } from "./game/save";
+import {
+  loadProfiles,
+  saveProfiles,
+  emptyProfile,
+  startFreshPreservingRecovery,
+} from "./game/save";
+import {
+  archiveMapSeed,
+  archiveRoomDefinitions,
+  createArchiveMap,
+  drawArchiveMap,
+  findArchivePath,
+  isMapWalkable,
+  visibleArchiveCells,
+  type ArchiveMap,
+  type ArchiveRoomId,
+  type MapPosition,
+} from "./game/archiveMap";
 import {
   applyAction,
-  canAfford,
+  canApplyAction,
   canResolve,
   checkFailure,
   finishShift,
@@ -36,10 +53,13 @@ const chapterNames = [
 const campaignComplete = (profile: Profile): boolean =>
   archiveCases.every((archiveCase) => profile.completedCases.includes(archiveCase.id));
 
-let profiles = loadProfiles();
+const loadedProfiles = loadProfiles();
+let profiles = loadedProfiles.profiles;
+let saveRecovery = loadedProfiles.recovery;
 let activeProfileId: number | null = null;
 let largeText = loadLargeTextPreference();
-let persistenceError = false;
+let persistenceError = loadedProfiles.persistenceError;
+let recoveryActionError: string | null = null;
 
 function loadLargeTextPreference(): boolean {
   try {
@@ -59,6 +79,7 @@ function selectedProfile(): Profile | undefined {
 }
 
 function persist(): void {
+  if (saveRecovery) return;
   persistenceError = !saveProfiles(profiles);
 }
 
@@ -121,12 +142,30 @@ function resourceBar(run: RunState): string {
 }
 
 function profileScreen(): string {
+  if (saveRecovery) {
+    return `<main class="screen title-screen">
+      <header class="masthead">
+        <p class="eyebrow">SAVE RECOVERY</p>
+        <h1>This file needs <em>care</em>.</h1>
+        <p class="intro">The saved archive could not be read. It has not been changed. Download a copy before choosing to start fresh.</p>
+      </header>
+      <section class="save-recovery" role="alert">
+        <h2>Original save preserved</h2>
+        <p>${escapeHtml(saveRecovery.reason)}</p>
+        ${recoveryActionError ? `<p class="recovery-error">${escapeHtml(recoveryActionError)}</p>` : ""}
+        <div class="recovery-actions">
+          <button class="button secondary" data-action="download-save">Download original save</button>
+          <button class="button primary" data-action="fresh-after-recovery">Start fresh · preserve backup</button>
+        </div>
+      </section>
+    </main>`;
+  }
   const slots = profiles.map((profile) => {
     const occupied = profile.loopCount > 0;
-    const runLabel = campaignComplete(profile)
-      ? "Replay campaign · memories kept"
-      : profile.run?.scene === "summary"
-        ? "Continue campaign"
+    const runLabel = profile.run?.scene === "summary"
+      ? campaignComplete(profile) ? "Review campaign ending" : "Review last shift"
+      : campaignComplete(profile)
+        ? "Replay campaign · memories kept"
         : profile.run
           ? "Continue current shift"
           : occupied
@@ -140,7 +179,7 @@ function profileScreen(): string {
         <p>${occupied ? `${profile.completedCases.length}/${archiveCases.length} files resolved · ${rememberedMoments} remembered moments` : "A separate campaign and memory."}</p>
       </div>
       <button class="button primary" data-action="select-profile" data-id="${profile.id}">${runLabel}</button>
-      ${occupied ? `<button class="text-button danger" data-action="reset-profile" data-id="${profile.id}">Reset this profile</button>` : ""}
+      ${occupied ? `<button class="text-button danger" data-action="reset-profile" data-id="${profile.id}" aria-label="Reset profile ${profile.id}">Reset this profile</button>` : ""}
     </article>`;
   }).join("");
 
@@ -275,7 +314,7 @@ function planningScreen(profile: Profile, run: RunState): string {
     const socialEffect = socialReward
       ? `<small>+${socialReward} Composure on resolve (max 4).</small>`
       : "";
-    return `<button class="choice-button ${run.approach === approach.label ? "chosen" : ""}" data-action="approach" data-value="${escapeHtml(approach.label)}">
+    return `<button class="choice-button ${run.approach === approach.label ? "chosen" : ""}" data-action="approach" data-value="${escapeHtml(approach.label)}" aria-pressed="${run.approach === approach.label}">
       <strong>${escapeHtml(approach.label)}</strong>
       <span>Lead: ${escapeHtml(leadAction.label)}${previewResolution ? ` → ${escapeHtml(previewResolution.label)}` : ""}</span>
       <small>${costLabel(leadCost, { matchingLead: true, timeRefund: leadAction.timeRefund })}</small>
@@ -322,6 +361,17 @@ function dialogueReaction(
               ? "focused"
               : "guarded",
   });
+  if (run.presentedClue) {
+    const clueRun = { ...run, clues: [...run.clues, run.presentedClue] };
+    const supportedResolution = archiveCase.resolutions.find((item) =>
+              hasClue(clueRun, item.clue),
+    );
+    const clueName = run.presentedClue.split(":")[1].replace(/-/g, " ");
+    const line = supportedResolution
+              ? `This ${clueName} record could support “${supportedResolution.label}.” We still have to choose what it means.`
+              : `I see the ${clueName} record. Let's keep to what it can actually tell us.`;
+    return createBeat("Evidence presented", line);
+  }
   const socialAction = archiveCase.actions.find((action) => action.memory);
   if (socialAction && run.clues.includes(socialAction.clue)) {
     return createBeat("After you spent a Favor", archiveCase.dialogue.afterFavor);
@@ -360,7 +410,7 @@ function archiveMemoryNote(
 function actionButton(action: CaseAction, run: RunState): string {
   const known = run.clues.includes(action.clue);
   const cost = getActionCost(run, action);
-  const affordable = canAfford(run, cost);
+  const affordable = canApplyAction(run, action);
   const matchingLead = (cost.time ?? 0) < (action.cost.time ?? 0);
   const timeAfterAction = Math.min(5, run.time - (cost.time ?? 0) + (action.timeRefund ?? 0));
   const timeWarning =
@@ -376,14 +426,204 @@ function actionButton(action: CaseAction, run: RunState): string {
   const memoryEffect = action.memory
     ? `<small>${escapeHtml(archiveCase?.character ?? "They")} will remember this.</small>`
     : "";
-  return `<button class="choice-button" data-action="investigate" data-id="${action.id}" ${known || !affordable ? "disabled" : ""}>
-    <strong>${escapeHtml(action.label)} ${known ? "· clue found" : ""}</strong>
+  const actionName = action.inspection ? "inspect-record" : "investigate";
+  return `<button class="choice-button" data-action="${actionName}" data-id="${escapeHtml(action.id)}" ${known || !affordable ? "disabled" : ""}>
+    <strong>${action.inspection ? "Inspect document: " : ""}${escapeHtml(action.label)} ${known ? "· clue found" : ""}</strong>
     <span>${escapeHtml(action.description)}</span>
     <small>${costLabel(cost, { matchingLead, timeRefund: action.timeRefund })}</small>
     ${memoryEffect}
     ${timeWarning}
     ${composureWarning}
   </button>`;
+}
+
+function inspectionPanel(run: RunState): string {
+  const archiveCase = getActiveCase(run);
+  const action = archiveCase?.actions.find((item) => item.id === run.inspectionActionId);
+  if (!action?.inspection) return "";
+  const inspection = action.inspection;
+  const options = inspection.options.map((option, index) =>
+    `<button class="choice-button inspection-option" data-action="inspect-answer" data-id="${index}">
+      <strong>${escapeHtml(option)}</strong>
+    </button>`,
+  ).join("");
+  return `<section class="inspection-panel" aria-labelledby="inspection-title">
+    <div class="inspection-heading">
+      <div><p class="eyebrow">DOCUMENT COMPARISON</p><h3 id="inspection-title">${escapeHtml(action.label)}</h3></div>
+      <button class="text-button" data-action="cancel-inspection">Close document</button>
+    </div>
+    <p>${escapeHtml(inspection.question)}</p>
+    <div class="document-versions">
+      <blockquote><small>EARLIER COPY</small>${escapeHtml(inspection.versionA)}</blockquote>
+      <blockquote><small>LATER COPY</small>${escapeHtml(inspection.versionB)}</blockquote>
+    </div>
+    ${run.inspectionFeedback ? `<p class="inspection-feedback" role="status">${escapeHtml(run.inspectionFeedback)}</p>` : ""}
+    <div class="choice-list">${options}</div>
+  </section>`;
+}
+
+function roomActionList(
+  archiveCase: NonNullable<ReturnType<typeof getActiveCase>>,
+  run: RunState,
+  room: ArchiveRoomId,
+  currentRoom: ArchiveRoomId | null,
+): string {
+  if (currentRoom !== room) return `<p class="room-empty">Navigate here to examine this room.</p>`;
+  const actions = archiveCase.actions.filter((action) => {
+    if (room === "records-desk") return Boolean(action.inspection);
+    if (room === "restricted-stacks") return Boolean(action.cost.composure);
+    if (room === "reading-room") return false;
+    return Boolean(action.memory);
+  });
+  return actions.length
+    ? `<div class="choice-list">${actions.map((action) => actionButton(action, run)).join("")}</div>`
+    : `<p class="room-empty">Nothing new to examine here.</p>`;
+}
+
+function evidenceRoom(
+  archiveCase: NonNullable<ReturnType<typeof getActiveCase>>,
+  run: RunState,
+  currentRoom: ArchiveRoomId | null,
+): string {
+  const clues = run.clues.filter((clue) => clue.startsWith(`${archiveCase.id}:`));
+  const evidence = currentRoom !== "reading-room"
+    ? `<p class="room-empty">Navigate here to present evidence to ${escapeHtml(archiveCase.character)}.</p>`
+    : clues.length
+      ? `<div class="evidence-options">${clues.map((clue) => {
+          const label = clue.split(":")[1].replace(/-/g, " ");
+          const selected = run.presentedClue === clue;
+          return `<button class="evidence-button ${selected ? "chosen" : ""}" data-action="present-evidence" data-id="${escapeHtml(clue)}" aria-pressed="${selected}">
+            <strong>${escapeHtml(label)}</strong><small>${selected ? "Presented" : "Present this clue"}</small>
+          </button>`;
+        }).join("")}</div>`
+      : `<p class="room-empty">Bring a clue here to discuss it with ${escapeHtml(archiveCase.character)}.</p>`;
+  return `<article class="archive-room reading-room">
+    <p class="room-index">01 · CONVERSATION${currentRoom === "reading-room" ? " · YOU ARE HERE" : ""}</p><h3>Reading Room</h3>
+    <p class="room-description">Bring evidence to ${escapeHtml(archiveCase.character)} and see which ending it supports.</p>
+    ${evidence}
+  </article>`;
+}
+
+function currentMapPosition(map: ArchiveMap, run: RunState): MapPosition {
+  return run.mapPosition && isMapWalkable(map, run.mapPosition)
+    ? run.mapPosition
+    : map.start;
+}
+
+function rememberMapPosition(
+  run: RunState,
+  map: ArchiveMap,
+  position: MapPosition,
+  route: MapPosition[] = [],
+): void {
+  const routeCells = route.map((point) => point.y * map.tiles.length + point.x);
+  run.mapPosition = position;
+  run.mapExplored = [...new Set([
+    ...run.mapExplored,
+    ...routeCells,
+    ...visibleArchiveCells(map, position),
+  ])];
+}
+
+function renderArchiveCanvas(
+  profile: Profile,
+  run: RunState,
+  archiveCase: NonNullable<ReturnType<typeof getActiveCase>>,
+): void {
+  const host = appRoot.querySelector<HTMLDivElement>(".rot-map-host");
+  if (!host) return;
+  const map = createArchiveMap(archiveMapSeed(profile.id, profile.loopCount, archiveCase.id));
+  const canvas = drawArchiveMap(map, currentMapPosition(map, run), run.mapExplored);
+  if (canvas && canvas.parentElement !== host) host.appendChild(canvas);
+}
+
+function mapDestinations(map: ArchiveMap, run: RunState): string {
+  const position = currentMapPosition(map, run);
+  const currentRoom = map.rooms.find((room) =>
+    room.position.x === position.x && room.position.y === position.y,
+  );
+  return `<div class="archive-map-destinations" role="group" aria-label="Room destinations">
+    ${map.rooms.map((room) => {
+      const path = findArchivePath(map, position, room.position);
+      const isCurrent = currentRoom?.id === room.id;
+      const distance = Math.max(0, path.length - 1);
+      const detail = isCurrent
+        ? "You are here"
+        : `${distance} steps · movement uses no Time`;
+      return `<button class="map-destination ${isCurrent ? "current" : ""}" data-action="navigate-room" data-id="${room.id}" aria-pressed="${isCurrent}" ${isCurrent || !path.length ? "disabled" : ""}>
+        <strong><span aria-hidden="true">${room.glyph}</span> ${room.label}</strong><small>${detail}</small>
+      </button>`;
+    }).join("")}
+  </div>`;
+}
+
+function handleArchiveMapKeydown(event: KeyboardEvent): boolean {
+  if (event.repeat || !(event.target instanceof HTMLElement)) return false;
+  if (!event.target.closest(".rot-map-frame")) return false;
+  const controls: Record<string, [number, number]> = {
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+  };
+  const direction = controls[event.key];
+  if (!direction) return false;
+  event.preventDefault();
+  appRoot.querySelector<HTMLButtonElement>(
+    `button[data-action="map-step"][data-dx="${direction[0]}"][data-dy="${direction[1]}"]`,
+  )?.click();
+  return true;
+}
+
+function investigationMap(
+  profile: Profile,
+  archiveCase: NonNullable<ReturnType<typeof getActiveCase>>,
+  run: RunState,
+): string {
+  const map = createArchiveMap(archiveMapSeed(profile.id, profile.loopCount, archiveCase.id));
+  const position = currentMapPosition(map, run);
+  const currentRoom = map.rooms.find((room) =>
+    room.position.x === position.x && room.position.y === position.y,
+  )?.id ?? null;
+  return `<section class="archive-map" aria-labelledby="archive-map-title">
+    <div class="archive-map-heading"><div><p class="eyebrow">THE ARCHIVE</p><h2 id="archive-map-title">Choose where to investigate</h2></div>
+      <p>The stacks shift each night. Explore with the arrows or choose a destination; movement costs no Time. Room actions use the displayed costs.</p>
+    </div>
+    <div class="archive-exploration">
+      <div class="rot-map-frame" role="group" tabindex="0" aria-label="Generated archive map. Use the arrow keys to explore.">
+        <div class="rot-map-host"></div>
+      </div>
+      <div class="archive-map-controls">
+        <p class="map-legend"><span>@</span> You · ${archiveRoomDefinitions.map((room) => `<span>${room.glyph}</span> ${room.label}`).join(" · ")}</p>
+        <div class="map-step-controls" role="group" aria-label="Move one step through the archive">
+          <button data-action="map-step" data-dx="0" data-dy="-1" aria-label="Move north">↑</button>
+          <button data-action="map-step" data-dx="-1" data-dy="0" aria-label="Move west">←</button>
+          <button data-action="map-step" data-dx="0" data-dy="1" aria-label="Move south">↓</button>
+          <button data-action="map-step" data-dx="1" data-dy="0" aria-label="Move east">→</button>
+        </div>
+        ${mapDestinations(map, run)}
+      </div>
+    </div>
+    <p class="map-status" role="status">${escapeHtml(run.mapMessage ?? `You are in ${map.rooms.find((room) => room.id === currentRoom)?.label ?? "the stacks"}.`)} Your route and explored rooms are saved for this case.</p>
+    <div class="archive-rooms">
+      ${evidenceRoom(archiveCase, run, currentRoom)}
+      <article class="archive-room">
+        <p class="room-index">02 · CATALOGUE${currentRoom === "records-desk" ? " · YOU ARE HERE" : ""}</p><h3>Records Desk</h3>
+        <p class="room-description">Compare copies and look for a detail that changed.</p>
+        ${roomActionList(archiveCase, run, "records-desk", currentRoom)}
+      </article>
+      <article class="archive-room">
+        <p class="room-index">03 · RESTRICTED${currentRoom === "restricted-stacks" ? " · YOU ARE HERE" : ""}</p><h3>Restricted Stacks</h3>
+        <p class="room-description">Follow the lead that may unsettle the shift.</p>
+        ${roomActionList(archiveCase, run, "restricted-stacks", currentRoom)}
+      </article>
+      <article class="archive-room">
+        <p class="room-index">04 · STAFF ONLY${currentRoom === "break-room" ? " · YOU ARE HERE" : ""}</p><h3>Break Room</h3>
+        <p class="room-description">Ask ${escapeHtml(archiveCase.character)} for help and spend a Favor.</p>
+        ${roomActionList(archiveCase, run, "break-room", currentRoom)}
+      </article>
+    </div>
+  </section>`;
 }
 
 function resolutionButton(resolution: Resolution, run: RunState): string {
@@ -411,7 +651,6 @@ function investigationScreen(profile: Profile, run: RunState): string {
   if (!archiveCase) return hubScreen(profile, run);
   const dialogue = dialogueReaction(profile, run, archiveCase);
   const memoryNote = archiveMemoryNote(profile, archiveCase);
-  const actions = archiveCase.actions.map((action) => actionButton(action, run)).join("");
   const resolutions = archiveCase.resolutions.map((resolution) => resolutionButton(resolution, run)).join("");
   const approach = run.approach ? `<p class="selected-lead"><strong>Your lead:</strong> ${escapeHtml(run.approach)}</p>` : "";
   const clues = run.clues
@@ -422,7 +661,7 @@ function investigationScreen(profile: Profile, run: RunState): string {
   const hasCaseClue = run.clues.some((clue) => clue.startsWith(`${archiveCase.id}:`));
   const clueStatus = hasCaseClue
     ? "Clue ready. Choose an ending."
-    : "Pick a lead to find a clue.";
+    : "Explore a room to find a clue.";
   return `<main class="screen">
     <div class="screen-toolbar"><button class="text-button back" data-action="back-hub">← Leave · +1 entry Time</button>${readingControl()}</div>
     ${resourceBar(run)}
@@ -434,11 +673,17 @@ function investigationScreen(profile: Profile, run: RunState): string {
         <strong>${archiveCase.character} · ${archiveCase.role}</strong>
       </div>
       ${memoryNote ? `<aside class="ledger-note"><strong>${escapeHtml(memoryNote.label)}:</strong> ${escapeHtml(memoryNote.line)}</aside>` : ""}
+      <details class="case-summary-panel">
+        <summary>Case file · objective and summary</summary>
+        <p>${escapeHtml(archiveCase.summary)}</p>
+        <p><strong>Objective:</strong> find a clue, then choose an ending that fits what you know.</p>
+      </details>
       ${renderDialoguePanel(dialogue, profile.id)}
       ${clues ? `<div class="clue-list" aria-label="Discovered clues">${clues}</div>` : ""}
     </section>
     <p class="helper" aria-live="polite">${clueStatus}</p>
-    <section class="choice-section"><h2>Investigate or talk</h2><div class="choice-list">${actions}</div></section>
+    ${investigationMap(profile, archiveCase, run)}
+    ${inspectionPanel(run)}
     <section class="choice-section"><h2>Resolve</h2><div class="choice-list">${resolutions}</div></section>
   </main>`;
 }
@@ -491,6 +736,7 @@ function summaryScreen(profile: Profile, run: RunState): string {
       ${facts ? `<ul>${facts}</ul>` : "<p>No lasting facts discovered yet.</p>"}
       <p>${profile.completedCases.length}/${archiveCases.length} cases filed · ${profile.currentFacts.length} fact${profile.currentFacts.length === 1 ? "" : "s"} this campaign · ${remembered.length ? escapeHtml(remembered.join(" · ")) : "No NPC memories yet."}</p>
     </section>
+    <p class="persistence-summary">Your filed cases, facts, and NPC memories persist. Unresolved clues and case progress from this shift reset; Time, Composure, and Favors also reset when the next shift begins.</p>
     <button class="button primary wide" data-action="${complete ? "replay-campaign" : "next-shift"}">${complete ? "Replay campaign · keep memories" : failed ? "Restart shift" : `Continue to chapter ${Math.min(nextChapter, chapterNames.length)}`}</button>
     <button class="text-button centered" data-action="profiles">Return to profiles</button>
   </main>`;
@@ -525,6 +771,10 @@ function render(): void {
   }
   renderPersistenceNotice();
   afterDialogueRender(run.scene === "investigation");
+  if (run.scene === "investigation") {
+    const archiveCase = getActiveCase(run);
+    if (archiveCase) renderArchiveCanvas(profile, run, archiveCase);
+  }
 }
 
 function startShift(profile: Profile, isFirstShift: boolean): void {
@@ -542,14 +792,21 @@ function startShift(profile: Profile, isFirstShift: boolean): void {
   render();
 }
 
-function closeCase(profile: Profile, run: RunState, resolution: Resolution): void {
+function closeCase(profile: Profile, run: RunState, resolution: Resolution): boolean {
   const archiveCase = getActiveCase(run);
-  if (!archiveCase) return;
+  const activeResolution = archiveCase?.resolutions.find((item) => item.id === resolution.id);
+  if (
+    !archiveCase ||
+    !activeResolution ||
+    profile.completedCases.includes(archiveCase.id) ||
+    run.resolvedCases.includes(archiveCase.id) ||
+    !canResolve(run, activeResolution)
+  ) return false;
   payCost(run, { time: 1 });
   let restoredComposure = 0;
-  if (resolution.socialClue && run.clues.includes(resolution.socialClue)) {
+  if (activeResolution.socialClue && run.clues.includes(activeResolution.socialClue)) {
     restoredComposure = Math.min(
-      resolution.composureReward ?? 0,
+      activeResolution.composureReward ?? 0,
       4 - run.composure,
     );
     run.composure += restoredComposure;
@@ -558,18 +815,25 @@ function closeCase(profile: Profile, run: RunState, resolution: Resolution): voi
   if (!profile.completedCases.includes(archiveCase.id)) {
     profile.completedCases.push(archiveCase.id);
   }
-  run.outcome = resolution.outcome;
-  run.history.push(`Resolved ${archiveCase.title}: ${resolution.label}.`);
+  run.outcome = activeResolution.outcome;
+  run.history.push(`Resolved ${archiveCase.title}: ${activeResolution.label}.`);
   if (restoredComposure > 0) {
     run.history.push(`Shared trust restored ${restoredComposure} Composure.`);
   }
-  if (!profile.facts.includes(resolution.fact)) profile.facts.push(resolution.fact);
-  if (!profile.currentFacts.includes(resolution.fact)) profile.currentFacts.push(resolution.fact);
+  if (!profile.facts.includes(activeResolution.fact)) profile.facts.push(activeResolution.fact);
+  if (!profile.currentFacts.includes(activeResolution.fact)) profile.currentFacts.push(activeResolution.fact);
   run.activeCaseId = null;
   run.approach = null;
+  run.inspectionActionId = null;
+  run.inspectionFeedback = null;
+  run.presentedClue = null;
+  run.mapPosition = null;
+  run.mapExplored = [];
+  run.mapMessage = null;
   run.scene = "hub";
   const failure = checkFailure(run);
   if (failure) finishShift(run, failure);
+  return true;
 }
 
 app.addEventListener("click", (event) => {
@@ -581,7 +845,45 @@ app.addEventListener("click", (event) => {
   const id = Number(button.dataset.id);
   const profile = selectedProfile();
 
+  if (
+    saveRecovery &&
+    action !== "download-save" &&
+    action !== "fresh-after-recovery"
+  ) return;
   if (handleDialogueAction(action, button.dataset.id, render)) return;
+  if (action === "download-save") {
+    if (!saveRecovery) return;
+    try {
+      const file = new Blob([saveRecovery.raw], { type: "application/json" });
+      const url = URL.createObjectURL(file);
+      const download = document.createElement("a");
+      download.href = url;
+      download.download = "night-shift-archive-save-recovery.json";
+      download.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      recoveryActionError = null;
+    } catch (error) {
+      console.error("Could not prepare the save recovery download.", error);
+      recoveryActionError = "The download could not be prepared. The original save remains untouched.";
+      render();
+    }
+    return;
+  }
+  if (action === "fresh-after-recovery") {
+    if (!saveRecovery) return;
+    if (!window.confirm("Start with empty profiles? The unreadable save will first be copied to a recovery backup in this browser.")) return;
+    if (!startFreshPreservingRecovery(saveRecovery)) {
+      recoveryActionError = "Could not safely create a backup and start fresh. The original save remains untouched.";
+      render();
+      return;
+    }
+    profiles = [1, 2, 3].map(emptyProfile);
+    saveRecovery = null;
+    recoveryActionError = null;
+    persistenceError = false;
+    render();
+    return;
+  }
   if (action === "toggle-reading") {
     largeText = !largeText;
     try {
@@ -602,9 +904,7 @@ app.addEventListener("click", (event) => {
     const selected = profiles.find((item) => item.id === id);
     if (!selected) return;
     activeProfileId = selected.id;
-    if (selected.run?.scene === "summary" && campaignComplete(selected)) {
-      render();
-    } else if (!selected.run || selected.run.scene === "summary") {
+    if (!selected.run) {
       startShift(selected, selected.loopCount === 0);
     } else {
       render();
@@ -623,8 +923,10 @@ app.addEventListener("click", (event) => {
   const run = profile.run;
 
   if (action === "next-shift") {
+    if (run.scene !== "summary" || campaignComplete(profile)) return;
     startShift(profile, false);
   } else if (action === "replay-campaign") {
+    if (run.scene !== "summary" || !campaignComplete(profile)) return;
     profile.chapter = 1;
     profile.completedCases = [];
     profile.currentFacts = [];
@@ -632,6 +934,7 @@ app.addEventListener("click", (event) => {
   } else if (action === "open-case") {
     const archiveCase = archiveCases.find((item) => item.id === button.dataset.id);
     if (
+      run.scene !== "hub" ||
       !archiveCase ||
       archiveCase.chapter !== profile.chapter ||
       profile.completedCases.includes(archiveCase.id) ||
@@ -642,39 +945,142 @@ app.addEventListener("click", (event) => {
     run.history.push(`Entered ${archiveCase.title}.`);
     run.activeCaseId = archiveCase.id;
     run.approach = null;
+    run.inspectionActionId = null;
+    run.inspectionFeedback = null;
+    run.presentedClue = null;
+    run.mapPosition = null;
+    run.mapExplored = [];
+    run.mapMessage = null;
     run.scene = "planning";
     const failure = checkFailure(run);
     if (failure) finishShift(run, failure);
     persist();
     render();
   } else if (action === "approach") {
-    run.approach = button.dataset.value ?? null;
+    const archiveCase = getActiveCase(run);
+    const approach = archiveCase?.approaches.find((item) => item.label === button.dataset.value);
+    if (run.scene !== "planning" || !approach) return;
+    run.approach = approach.label;
     persist();
     render();
   } else if (action === "begin-investigation") {
-    if (!run.approach) return;
+    const archiveCase = getActiveCase(run);
+    if (
+      run.scene !== "planning" ||
+      !run.approach ||
+      !archiveCase?.approaches.some((item) => item.label === run.approach)
+    ) return;
     run.history.push(`Planned lead: ${run.approach}.`);
     run.scene = "investigation";
+    const map = createArchiveMap(archiveMapSeed(profile.id, profile.loopCount, archiveCase.id));
+    rememberMapPosition(run, map, map.start);
+    run.mapMessage = `The ${map.rooms[0].label} is your starting point. Movement does not spend Time.`;
     persist();
     render();
+  } else if (action === "map-step") {
+    const archiveCase = getActiveCase(run);
+    const deltaX = Number(button.dataset.dx);
+    const deltaY = Number(button.dataset.dy);
+    if (
+      run.scene !== "investigation" ||
+      !archiveCase ||
+      !Number.isInteger(deltaX) ||
+      !Number.isInteger(deltaY) ||
+      Math.abs(deltaX) + Math.abs(deltaY) !== 1
+    ) return;
+    const map = createArchiveMap(archiveMapSeed(profile.id, profile.loopCount, archiveCase.id));
+    const current = currentMapPosition(map, run);
+    const destination = { x: current.x + deltaX, y: current.y + deltaY };
+    if (!isMapWalkable(map, destination)) return;
+    rememberMapPosition(run, map, destination);
+    run.mapMessage = "You move through the stacks. Movement does not spend Time.";
+    persist();
+    render();
+    appRoot.querySelector<HTMLDivElement>(".rot-map-frame")?.focus();
+  } else if (action === "navigate-room") {
+    const archiveCase = getActiveCase(run);
+    if (run.scene !== "investigation" || !archiveCase) return;
+    const map = createArchiveMap(archiveMapSeed(profile.id, profile.loopCount, archiveCase.id));
+    const room = map.rooms.find((item) => item.id === button.dataset.id);
+    if (!room) return;
+    const route = findArchivePath(map, currentMapPosition(map, run), room.position);
+    if (!route.length) return;
+    rememberMapPosition(run, map, room.position, route);
+    run.mapMessage = `You follow a ${route.length - 1}-step route to the ${room.label}. Movement does not spend Time.`;
+    persist();
+    render();
+    appRoot.querySelector<HTMLDivElement>(".rot-map-frame")?.focus();
   } else if (action === "investigate") {
     const archiveCase = getActiveCase(run);
     const selectedAction = archiveCase?.actions.find((item) => item.id === button.dataset.id);
-    if (!selectedAction || !canAfford(run, getActionCost(run, selectedAction)) || run.clues.includes(selectedAction.clue)) return;
-    applyAction(profile, run, selectedAction);
+    if (!selectedAction || selectedAction.inspection || !applyAction(profile, run, selectedAction)) return;
     run.history.push(`Pursued: ${selectedAction.label}.`);
     const failure = checkFailure(run);
     if (failure) finishShift(run, failure);
+    persist();
+    render();
+  } else if (action === "inspect-record") {
+    const archiveCase = getActiveCase(run);
+    const selectedAction = archiveCase?.actions.find((item) => item.id === button.dataset.id);
+    if (
+      !selectedAction?.inspection ||
+      !canApplyAction(run, selectedAction)
+    ) return;
+    run.inspectionActionId = selectedAction.id;
+    run.inspectionFeedback = null;
+    run.presentedClue = null;
+    persist();
+    render();
+  } else if (action === "inspect-answer") {
+    const archiveCase = getActiveCase(run);
+    const selectedAction = archiveCase?.actions.find((item) => item.id === run.inspectionActionId);
+    const answer = Number(button.dataset.id);
+    if (
+      !selectedAction?.inspection ||
+      !Number.isInteger(answer) ||
+      answer < 0 ||
+      answer >= selectedAction.inspection.options.length
+    ) return;
+    if (answer !== selectedAction.inspection.answer) {
+      run.inspectionFeedback = "That detail does not match the change between these copies. Compare them again.";
+      persist();
+      render();
+      return;
+    }
+    if (!applyAction(profile, run, selectedAction)) return;
+    run.history.push(`Compared the records: ${selectedAction.label}.`);
+    const failure = checkFailure(run);
+    if (failure) finishShift(run, failure);
+    persist();
+    render();
+  } else if (action === "cancel-inspection") {
+    if (run.scene !== "investigation") return;
+    run.inspectionActionId = null;
+    run.inspectionFeedback = null;
+    persist();
+    render();
+  } else if (action === "present-evidence") {
+    const archiveCase = getActiveCase(run);
+    const clue = button.dataset.id;
+    if (
+      run.scene !== "investigation" ||
+      !archiveCase ||
+      !clue ||
+      !run.clues.includes(clue) ||
+      !clue.startsWith(`${archiveCase.id}:`)
+    ) return;
+    run.presentedClue = clue;
     persist();
     render();
   } else if (action === "resolve-case") {
     const archiveCase = getActiveCase(run);
     const resolution = archiveCase?.resolutions.find((item) => item.id === button.dataset.id);
     if (!resolution || !canResolve(run, resolution)) return;
-    closeCase(profile, run, resolution);
+    if (!closeCase(profile, run, resolution)) return;
     persist();
     render();
   } else if (action === "back-hub") {
+    if (run.scene !== "planning" && run.scene !== "investigation") return;
     const archiveCase = getActiveCase(run);
     if (archiveCase) {
       run.time = Math.min(5, run.time + 1);
@@ -682,10 +1088,17 @@ app.addEventListener("click", (event) => {
     }
     run.activeCaseId = null;
     run.approach = null;
+    run.inspectionActionId = null;
+    run.inspectionFeedback = null;
+    run.presentedClue = null;
+    run.mapPosition = null;
+    run.mapExplored = [];
+    run.mapMessage = null;
     run.scene = "hub";
     persist();
     render();
   } else if (action === "end-shift") {
+    if (run.scene !== "hub") return;
     run.history.push("Closed the shift early.");
     finishShift(run, "You choose to close the ledger early and leave the unanswered stories for another night.");
     persist();
@@ -698,6 +1111,7 @@ appRoot.addEventListener("change", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (handleArchiveMapKeydown(event)) return;
   handleDialogueKeydown(
     event,
     selectedProfile()?.run?.scene === "investigation",

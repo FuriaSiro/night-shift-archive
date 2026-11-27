@@ -7,8 +7,11 @@ A single-player narrative roguelike about filing unfinished stories across a seq
 - Three independent browser profiles and a six-case campaign across three chapters.
 - Four new cases and NPCs follow Ada and Ivo's opening chapter.
 - Case planning, clue-based resolutions, and authored alternative outcomes.
+- Four-room investigations: compare document copies at the Records Desk, pursue risky leads in the Restricted Stacks, ask for help in the Break Room, and present evidence in the Reading Room.
+- The archive map now uses rot.js to generate a shifting floor, reveal nearby passages, and find routes to rooms; keyboard, touch, and direct destination controls are supported.
 - Time, Composure, and Favors with visible costs; zero Time or Composure ends a shift.
 - Chapter progress and resolved cases persist. Shift resources reset; facts and NPC familiarity carry forward.
+- A shift summary states which records persist and which unresolved clues reset before the next shift.
 - Each shift starts with 1 Favor, making the social approach a limited choice across two cases.
 - One safe lead in “The Shelf That Moved” takes longer, making its plan meaningfully different from social and risky leads.
 - Prior-file reactions appear as persistent margin notes and follow the newest relevant fact.
@@ -35,6 +38,8 @@ The campaign map shows all six cases, chapter progress, and which authored endin
 
 Gameplay outcomes are deterministic: there are no random combat results, stat-check unlocks, XP grind, or filler encounters. Clues, costs, and failure thresholds are shown before choices. The only randomness is pitch variation in optional dialogue SFX; it has no effect on a run. Repeated dialogue beats display instantly within the current profile's session, and the transcript/backstep remain available for rereading.
 
+During a case, each room offers a different way to investigate. Comparing two document copies requires spotting their changed detail; a wrong answer costs no resources, while a correct one records the clue for the usual case resolutions. Discovered clues can be presented to the character in the Reading Room, where the dialogue explains which ending the evidence could support. Room actions use their displayed costs and the existing shift clock.
+
 No external assets or runtime asset APIs were added. If placeholder art or audio is added later, download only selected assets, check the current license for each individual item, and record its creator, source, license, and required attribution. Candidate libraries include [Kenney](https://kenney.nl/assets), [OpenGameArt](https://opengameart.org/), [Game-icons](https://game-icons.net/), [itch.io game assets](https://itch.io/game-assets/free), and [Freesound](https://freesound.org/). For music, check the per-track terms at [Free Music Archive](https://freemusicarchive.org/) or [Incompetech](https://incompetech.com/music/royalty-free/). Terms vary by asset and can change. Keep assets self-hosted so the prototype does not depend on API keys, rate limits, or third-party availability.
 
 ## V1.9 visual direction
@@ -55,7 +60,7 @@ Resolved case facts remain in the profile's full archive. The current campaign's
 
 On an older save without the `currentFacts` field, the saved facts are used as the current campaign's facts until the player replays the campaign.
 
-Saves use `localStorage` and are local to this browser and site origin; they do not sync between friends, devices, or `localhost` and the deployed site.
+Saves use versioned `localStorage` data and are local to this browser and site origin; they do not sync between friends, devices, or `localhost` and the deployed site. The previous save format migrates automatically. If saved data is malformed or from a newer version, the game leaves it untouched and offers a download before creating a fresh save with a local recovery backup.
 
 ## V1.6 dialogue controls
 

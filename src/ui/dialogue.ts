@@ -308,7 +308,7 @@ function renderAndFocus(rerender: () => void, selector = ".dialogue-stage"): voi
 
 function focusNextChoice(): void {
   document.querySelector<HTMLButtonElement>(
-    'button[data-action="investigate"]:not(:disabled), button[data-action="resolve-case"]:not(:disabled)',
+    'button[data-action="inspect-record"]:not(:disabled), button[data-action="investigate"]:not(:disabled), button[data-action="resolve-case"]:not(:disabled)',
   )?.focus();
 }
 

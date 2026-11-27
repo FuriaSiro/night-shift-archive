@@ -12,6 +12,12 @@ export function newRun(): RunState {
     activeCaseId: null,
     approach: null,
     clues: [],
+    inspectionActionId: null,
+    inspectionFeedback: null,
+    presentedClue: null,
+    mapPosition: null,
+    mapExplored: [],
+    mapMessage: null,
     outcome: null,
     endReason: null,
   };
@@ -58,23 +64,49 @@ export function hasClue(run: RunState, clue: string): boolean {
 }
 
 export function canResolve(run: RunState, resolution: Resolution): boolean {
-  return hasClue(run, resolution.clue) && run.time >= 1;
+  if (run.scene !== "investigation") return false;
+  const archiveCase = getActiveCase(run);
+  const activeResolution = archiveCase?.resolutions.find((item) => item.id === resolution.id);
+  if (!archiveCase || !activeResolution || run.resolvedCases.includes(archiveCase.id)) return false;
+  return hasClue(run, activeResolution.clue) && run.time >= 1;
 }
 
-export function applyAction(profile: Profile, run: RunState, action: CaseAction): void {
-  payCost(run, getActionCost(run, action));
-  run.time = Math.min(5, run.time + (action.timeRefund ?? 0));
-  if (!run.clues.includes(action.clue)) run.clues.push(action.clue);
-  if (action.memory) {
-    profile.npcMemories[action.memory] = (profile.npcMemories[action.memory] ?? 0) + 1;
+export function canApplyAction(run: RunState, action: CaseAction): boolean {
+  if (run.scene !== "investigation") return false;
+  const archiveCase = getActiveCase(run);
+  const activeAction = archiveCase?.actions.find((item) => item.id === action.id);
+  if (!activeAction || run.clues.includes(activeAction.clue)) return false;
+  return canAfford(run, getActionCost(run, activeAction));
+}
+
+export function applyAction(profile: Profile, run: RunState, action: CaseAction): boolean {
+  if (!canApplyAction(run, action)) return false;
+  const activeAction = getActiveCase(run)?.actions.find((item) => item.id === action.id);
+  if (!activeAction) return false;
+  payCost(run, getActionCost(run, activeAction));
+  run.time = Math.min(5, run.time + (activeAction.timeRefund ?? 0));
+  if (!run.clues.includes(activeAction.clue)) run.clues.push(activeAction.clue);
+  run.inspectionActionId = null;
+  run.inspectionFeedback = null;
+  run.presentedClue = null;
+  if (activeAction.memory) {
+    profile.npcMemories[activeAction.memory] = (profile.npcMemories[activeAction.memory] ?? 0) + 1;
   }
+  return true;
 }
 
 export function finishShift(run: RunState, reason: string): void {
+  if (run.scene === "summary") return;
   run.scene = "summary";
   run.endReason = reason;
   run.activeCaseId = null;
   run.approach = null;
+  run.inspectionActionId = null;
+  run.inspectionFeedback = null;
+  run.presentedClue = null;
+  run.mapPosition = null;
+  run.mapExplored = [];
+  run.mapMessage = null;
 }
 
 export function checkFailure(run: RunState): string | null {

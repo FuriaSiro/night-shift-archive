@@ -55,6 +55,17 @@ export const archiveCases: ArchiveCase[] = [
         description: "Look for a repeated mark that could point to a missing ending.",
         cost: { time: 1 },
         clue: "bell:ink",
+        inspection: {
+          versionA: "At the bell, leave a blank line for the next reader.",
+          versionB: "At the bell, leave no line for the next reader.",
+          question: "What changed between the two copies?",
+          options: [
+            "The instruction changed from leaving a blank line to leaving no line.",
+            "The bell was removed from the instruction.",
+            "The next reader was replaced by the archivist.",
+          ],
+          answer: 0,
+        },
       },
       {
         id: "ask-ada",
@@ -126,6 +137,17 @@ export const archiveCases: ArchiveCase[] = [
         description: "Trace the catalog marks without playing the tape.",
         cost: { time: 1 },
         clue: "voice:script",
+        inspection: {
+          versionA: "BORROWED VOICE · return to the west stacks at dawn",
+          versionB: "BORROWED VOICE · return to the east stacks at dawn",
+          question: "Which detail does not match the earlier label?",
+          options: [
+            "The recording's destination changed from the west stacks to the east stacks.",
+            "The label changed from borrowed voice to original recording.",
+            "The return time changed from dawn to midnight.",
+          ],
+          answer: 0,
+        },
       },
       {
         id: "ask-ivo",
@@ -214,6 +236,17 @@ export const archiveCases: ArchiveCase[] = [
         description: "Trace the date without opening the letter.",
         cost: { time: 1 },
         clue: "address:stamp",
+        inspection: {
+          versionA: "RETURN ADDRESS · tomorrow · recipient: [blank]",
+          versionB: "RETURN ADDRESS · tomorrow · recipient: Nera",
+          question: "What was added to the second copy?",
+          options: [
+            "A recipient's name was added where the address was blank.",
+            "The date changed from tomorrow to yesterday.",
+            "The letter was marked as already opened.",
+          ],
+          answer: 0,
+        },
       },
       {
         id: "nera-trust",
@@ -292,6 +325,17 @@ export const archiveCases: ArchiveCase[] = [
         description: "Compare the shelf's footprint across rooms; checking all three takes time.",
         cost: { time: 2 },
         clue: "shelf:dust",
+        inspection: {
+          versionA: "DUST TRACE · Reading Room / Records Desk / Restricted Stacks",
+          versionB: "DUST TRACE · Reading Room / Records Desk",
+          question: "Which location is missing from the newer trace?",
+          options: [
+            "Restricted Stacks",
+            "Reading Room",
+            "Records Desk",
+          ],
+          answer: 0,
+        },
       },
       {
         id: "tovin-guide",
@@ -370,6 +414,17 @@ export const archiveCases: ArchiveCase[] = [
         description: "Find when the light was last meant to go out.",
         cost: { time: 1 },
         clue: "lamp:ledger",
+        inspection: {
+          versionA: "LAMP LEDGER · scheduled to go dark at 05:00",
+          versionB: "LAMP LEDGER · scheduled to go dark at 06:00",
+          question: "What changed in the revised ledger?",
+          options: [
+            "The scheduled closing time moved one hour later.",
+            "The lamp was moved to a different desk.",
+            "The book was checked out before dawn.",
+          ],
+          answer: 0,
+        },
       },
       {
         id: "mara-trust",
@@ -448,6 +503,17 @@ export const archiveCases: ArchiveCase[] = [
         description: "Look for the one line the index cannot complete.",
         cost: { time: 1 },
         clue: "index:blank",
+        inspection: {
+          versionA: "MORNING INDEX · one entry remains open for a future reader",
+          versionB: "MORNING INDEX · every entry has been completed",
+          question: "What instruction replaced the open entry?",
+          options: [
+            "Complete every entry instead of leaving one open.",
+            "Move the open entry to the previous night.",
+            "Remove the index from the archive.",
+          ],
+          answer: 0,
+        },
       },
       {
         id: "eren-trust",
