@@ -2,7 +2,31 @@
 
 A single-player narrative roguelike about filing unfinished stories across a sequence of night shifts. It is a static Vite + TypeScript site: no backend, account system, runtime AI, or paid game content.
 
-## What is in V1.10
+## What is in V2.3
+
+- A new **Night Council** appears at the start of each shift. Choose one order: gain a Favor, waive the first case's entry Time, or reduce the first risky lead's Composure cost.
+- The order is shown through planning and investigation, consumed only when used, and recorded in the shift log.
+- Existing V2.2 interview topics, evidence presentation, maps, and campaign progression remain available.
+- Saves use version 4. V2.2/V2.1 versioned saves and older V1 profile saves migrate without discarding campaign progress; malformed or unsupported saves still enter recovery.
+- The update uses original staff orders and archive setting; it does not reproduce another game's characters, writing, art, maps, or encounter scripts.
+
+## Friend playtest checklist
+
+- Start an empty profile and check that all three Night Council orders are understandable and only one can be selected.
+- Test each order in separate profiles: extra Favor starts at 2; Fast Index waives exactly one entry cost; Quiet Watch discounts exactly one risky lead.
+- Resolve or leave a case, refresh the page, and confirm the order's remaining/used state persists correctly.
+- Try both a document and social/risky approach; verify displayed costs, warnings, Time refunds, and shift failure behavior.
+- Refresh during planning and investigation; confirm the selected case, map, clues, and conversation state resume.
+- Use a V2.2 save if available, then confirm all existing profile progress remains and the next new shift asks for a Council order.
+- Try a narrow/mobile viewport, keyboard map controls, text-size toggle, and dialogue controls.
+- Record browser/device, what you expected, what happened, and the exact steps for each bug. Do not clear site data during a save test; report save issues before changing browser storage.
+
+## What was in V2.2 and earlier
+
+- The Reading Room includes an original **Interview Desk** for each character.
+- Each case provides three authored conversation topics about motive, boundaries, and evidence; asking is free and repeatable.
+- Interview selections remain visible in the Reading Room and in the case dialogue until the case is filed or the shift changes.
+- Evidence presentation and interview topics use separate state.
 
 - Three independent browser profiles and a six-case campaign across three chapters.
 - Four new cases and NPCs follow Ada and Ivo's opening chapter.
@@ -23,6 +47,14 @@ A single-player narrative roguelike about filing unfinished stories across a seq
 - Dialogue has a typewriter, optional quiet SFX, speed controls, auto-focus, history, and backstep.
 - The visual system uses local font fallbacks, CSS-only archive details, and subtle chapter color shifts.
 - The hub includes a campaign map for chapter locks, filed cases, open-case navigation, and endings found across replays.
+- Document comparisons stay inside the Records Desk card and move focus to the opened inspection; presenting evidence also shows the NPC response beside that clue.
+- The archive map announces your current room or corridor, open paths, walls, and grid position. Room destinations come before step controls, and blocked movement is announced without spending Time.
+- Unfiled clues are called out before leaving a case or ending a shift; confirmation and the shift summary explain when they reset.
+- Resolution choices name their required evidence across all six cases, and the resource bar stays visible while scrolling.
+- Dialogue speed help appears beside the controls; the persisted Instant option remains available for players who prefer no typewriter.
+- The Canva design direction is reflected in clearer profile/resume states, chapter-and-case context, paper-toned comparison documents, and a distinct selected-evidence state.
+- Interactive controls use larger touch targets with consistent spacing; existing focus, reduced-motion, and responsive behaviors remain in place.
+- The Canva mockup's optional carryover and resource changes are not enabled: unfiled clues and unfinished case progress still reset at shift end, and shifts retain the existing resource rules.
 
 The campaign is **designed toward** a 45–60 minute first playthrough when players read the case scenes and try different leads. That duration has not been established by timed player tests; measure it with friends before advertising it as a one-hour game.
 
@@ -216,17 +248,11 @@ Copy this small table into your own notes (or add reviewed decisions below). AI 
 
 After you collect V2 output, paste only the accepted idea into Copilot's implementation prompt below. Do not ask Copilot to implement an entire unreviewed AI response.
 
-## Recommended AI-helper workflow
+## Earlier V2 campaign and writing workflow
 
-Work in this order so each tool has a small, clear job:
+The V2 prompts below are retained for campaign pacing, NPC writing, and the original Canva moodboard. For the current recommended screen-and-game-flow improvement process, use the **V2.5 workflow** later in this README.
 
-1. **Gemini (your Student Pro account):** use the V2 campaign review prompt above. Ask for source-grounded feedback, not a rewrite.
-2. **DeepSeek (free account):** use the V2 prompt one NPC at a time for short, trigger-specific dialogue. Treat every line as a draft.
-3. **Canva AI:** use the V2 moodboard prompt above for optional visual direction; don't generate a complete game screen.
-4. **Copilot in VS Code:** implement one accepted change at a time, in the existing project.
-5. **Playtest with friends:** observe where they hesitate before explaining anything. Change one issue, rebuild, and test again.
-
-AI products, plan names, free allowances, and available Canva features can change. If a feature is unavailable in your account, skip it; the game does not depend on these services. Do not paste passwords, API keys, private messages, or personal data into AI tools.
+AI products, plan names, free allowances, and available features can change. The project does not depend on these services. Do not paste passwords, API keys, private messages, or personal data into AI tools.
 
 ### Optional: use the original Gemini prompt for the opening chapter only
 
@@ -373,6 +399,169 @@ Ask two or three friends to play without coaching. Watch for behavior rather tha
 | Do they want to replay? | They start again to test a different case outcome. |
 
 After each session, fix the single most repeated point of confusion. Avoid adding more tutorial text if a button label, cost, or outcome message can explain the rule.
+
+## V2.5 workflow: improve the current game flow
+
+Use each tool for a different job: **Figma explores the interface, Gemini critiques the experience, DeepSeek helps with a focused implementation question, and VS Code remains the source of truth for code. Vite runs and builds the game; it is not a design tool.**
+
+The tools do not automatically share context or keep designs and code in sync. Transfer the brief, screenshots, and measurements yourself. Features and usage limits vary by account and can change, so use whatever access you currently have. Do not provide private player data, credentials, or secrets.
+
+Each AI step below includes a copy-ready prompt. Replace the bracketed text, and provide only the listed context; these tools do not automatically see this repository or each other's responses.
+
+| Tool | What to paste or attach | What to ask it to do |
+| --- | --- | --- |
+| Gemini | The completed screen-flow brief and a screenshot or description of the current screen | Critique UX and accessibility; prioritize issues, don't implement |
+| Figma AI | The brief, accepted Gemini recommendations, and optionally a screenshot for reference | Explore low-fidelity screen layouts and reusable visual tokens |
+| VS Code Copilot | The bounded change, Figma measurements or screenshot, and the repository workspace | Implement one approved change in the actual project |
+| Vite | No AI prompt; run the local app and provide the URL to your browser | Check and test the implementation at desktop and phone sizes |
+| DeepSeek | One focused question and only the relevant code excerpts or file tree | Suggest or review an implementation approach; don't build the whole game |
+
+### Step 1: define one screen flow in a short brief
+
+Start with one complete case path, not the whole campaign:
+
+```text
+Current flow: profile selection → archive hub/map → plan a case → investigate a room → inspect a clue → present evidence in conversation → resolve or leave the case → shift summary.
+
+For this pass, I want to improve:
+[Name one confusing screen or transition.]
+
+Players should be able to tell:
+- Their current objective and the next available action.
+- What each action costs before confirming it.
+- Which clues and resources they have.
+- What resets and what persists when a shift ends.
+
+Constraints: preserve the existing Vite + TypeScript static app, game rules, local saves, and original story. Do not add a backend, runtime AI, account system, or unapproved mechanics.
+```
+
+Keep the brief specific to the screen or interaction you want to improve. Record any proposed mechanic as a proposal, not as something the current game already supports.
+
+### Step 2: ask Gemini for UX and accessibility critique
+
+In Gemini, paste the prompt below, replace the bracketed text with your brief, and attach a screenshot or describe the current screen. A UX critique usually needs the screen and flow, not the whole codebase. Ask for analysis and prioritized recommendations, not a rewrite:
+
+```text
+I’m improving the UI/UX of The Night-Shift Archive, an original browser game about an archivist investigating unfinished stories. The current game includes route planning, an archive map, Time/Composure/Favors, clue inspection, evidence-based conversations, and shift summaries.
+
+Here is the screen flow and the screen I want reviewed:
+[Paste the brief and describe or attach the current screen.]
+
+Players should always understand:
+- Their objective and available next actions.
+- The cost and likely consequence before confirming an action.
+- Their discovered clues and current resources.
+- What resets and what persists when a shift ends.
+
+Give me the three most important UX improvements, with a specific issue and recommendation for each. Consider keyboard access, touch use, readability, cognitive load, reduced motion, and players who need more time to read. Separate essential fixes from optional polish. Do not invent mechanics or write an implementation.
+```
+
+Keep only recommendations that fit the actual game rules and can be verified in play.
+
+### Step 3: design a small set of screens in Figma
+
+In Figma AI, paste the prompt below and replace the bracketed text with the brief and only the Gemini recommendations you accepted. You can also attach the current screen as a visual reference; do not paste the whole codebase. Design only the screens needed for this pass. A useful first set is profile selection, archive hub/map, investigation and clue inspection, evidence-based conversation, and shift summary. Do not design every case or dialogue branch.
+
+```text
+Create a low-fidelity, responsive UI direction for The Night-Shift Archive, an original browser narrative investigation game.
+
+Use this screen brief and accepted UX feedback:
+[Paste the brief and only the recommendations you accepted.]
+
+Design only the relevant screens from this flow:
+1. Profile selection.
+2. Archive hub/map with objective and resource display.
+3. Investigation screen with a document or clue interaction.
+4. Conversation where the player can present discovered evidence.
+5. Shift summary showing what resets and what persists.
+
+Requirements:
+- Show Time, Composure, and Favors as labeled values; do not rely on color alone.
+- Show action costs before selection and include clear selected, disabled, focus, and confirmation states.
+- Make controls comfortable to tap on a narrow phone screen.
+- If clues can be moved, include tap-to-select and tap-to-place as an alternative to dragging.
+- Use reusable components and a small set of spacing, typography, and color tokens.
+- Keep dialogue readable and avoid decorative elements that compete with it.
+- Do not invent additional game systems or write large amounts of story text. Mark any proposed feature that is not in the brief as optional.
+
+Return screen layouts and a compact design system that can be implemented with HTML and CSS.
+```
+
+Treat Figma as a reference, not a pixel-perfect mandate. Record colors, type sizes, spacing, and component states. If you use generated images, keep track of their licensing and source; prefer placeholders until an asset is needed.
+
+### Step 4: implement one screen or interaction in VS Code
+
+VS Code is where the real project, final decisions, and tested code live. In Copilot Chat, provide the Figma measurements or screenshot, accepted UX recommendation, and one bounded task. Ask Copilot to inspect the workspace files rather than relying on a mockup or copied code alone. Use the Figma output as a reference and implement one change at a time.
+
+```text
+Inspect the existing Night-Shift Archive Vite + TypeScript project before editing.
+
+Implement only this screen or interaction:
+[Describe one change.]
+
+Design reference:
+[Paste relevant Figma measurements, colors, typography, component states, or a screenshot description.]
+
+Requirements:
+- Follow the existing project structure and conventions.
+- Keep gameplay rules out of presentation code and do not invent game functionality.
+- Preserve the static deployment, existing save behavior, and original content.
+- Support keyboard, mouse, and touch with semantic controls, visible focus, and accessible labels.
+- Keep the layout responsive for desktop and narrow mobile screens.
+- Do not add a dependency or rewrite unrelated files.
+- Run the available checks, including `npm run build`, and report actual results.
+
+First list the files you expect to change. If the design conflicts with the current game rules or the context is insufficient, explain that before editing.
+```
+
+Use Copilot Chat in Ask mode for explanations and Agent mode for a bounded edit. Review the diff yourself; VS Code and the repository remain authoritative if a design mockup or AI suggestion disagrees with the code.
+
+### Step 5: run it with Vite and test desktop and phone layouts
+
+There is no prompt to send to Vite. In the VS Code terminal, run the app and open its local URL in a browser. Use Vite for fast local feedback, not design generation:
+
+```sh
+npm run dev
+```
+
+Open the local URL and test the changed flow at a wide desktop size and a narrow phone size. Check focus order, touch target size, text wrapping, costs, disabled states, and that there is always a clear next action or exit. After changes, run:
+
+```sh
+npm run build
+```
+
+Vite confirms the app runs and builds; it does not determine whether the interface is understandable or accessible. Test those outcomes yourself and, when useful, ask Gemini or a human reviewer to critique a specific screen.
+
+### Step 6: ask DeepSeek one focused code question or review
+
+In DeepSeek, paste the prompt below with one specific question and only the smallest relevant code excerpts or file tree. It cannot see the VS Code workspace unless you provide context. Do not paste credentials, private player data, or unrelated source code. Ask for a narrow review or implementation idea, not a complete game:
+
+```text
+I’m working in a Vite + TypeScript project. Review or suggest an approach for only this focused task:
+[Describe one component, interaction, or code concern.]
+
+Relevant existing files or excerpts:
+[Paste the smallest relevant code or file tree.]
+
+Constraints:
+- Follow the existing project structure and conventions.
+- Do not add a dependency or invent missing architecture.
+- Keep gameplay rules out of presentation code.
+- Support keyboard, mouse, and touch where relevant.
+- Include visible focus and accessible labels.
+- Explain the files involved and provide a short manual test checklist.
+- If the context is insufficient, say what information is missing instead of guessing.
+```
+
+Treat its output as a proposal. Check it against the actual project, review any code before accepting it, and run the relevant checks in VS Code.
+
+### Step 7: save a working milestone in Git
+
+When the change works and the checks pass, review the diff and commit that milestone. Use a message that describes the user-visible change. Commit before starting a larger or unrelated edit so a later change can be reviewed or reverted independently.
+
+### Keep the first design pass small
+
+Prove one complete case flow first: **hub → plan → inspect clue → present evidence → resolve case → shift summary**. This reveals unclear costs, cramped dialogue, confusing clues, or awkward touch controls early, without requiring designs for every branch.
 
 ## Run and verify locally
 

@@ -1,4 +1,4 @@
-import type { CaseAction, Resolution } from "../game/types";
+import type { CaseAction, InterviewTopic, Resolution } from "../game/types";
 
 export interface ArchiveCase {
   id: string;
@@ -19,6 +19,7 @@ export interface ArchiveCase {
   };
   priorFactReactions?: { fact: string; line: string }[];
   approaches: { label: string; actionId: string }[];
+  interviewTopics: InterviewTopic[];
   actions: CaseAction[];
   resolutions: Resolution[];
 }
@@ -47,6 +48,11 @@ export const archiveCases: ArchiveCase[] = [
       { label: "Study the ink", actionId: "ink" },
       { label: "Listen for the pattern", actionId: "ring-bell" },
       { label: "Earn Ada's trust", actionId: "ask-ada" },
+    ],
+    interviewTopics: [
+      { id: "bell-arrival", label: "Who was the bell meant to call?", question: "Who was the bell meant to call?", response: "Ada says the margin names no person. It may have been written as an invitation, not a summons." },
+      { id: "bell-missing", label: "What is missing from the story?", question: "What is missing from the story?", response: "Ada has kept the blank final page separate from the rest. She does not call it unfinished; she calls it unclaimed." },
+      { id: "bell-choice", label: "What can you still choose?", question: "What can you still choose?", response: "Ada believes the bell's meaning can be recorded without being treated as proof." },
     ],
     actions: [
       {
@@ -129,6 +135,11 @@ export const archiveCases: ArchiveCase[] = [
       { label: "Read the label", actionId: "label" },
       { label: "Ask Ivo to listen with you", actionId: "ask-ivo" },
       { label: "Test the recording", actionId: "play-recording" },
+    ],
+    interviewTopics: [
+      { id: "voice-owner", label: "Whose voice was recorded?", question: "Whose voice was recorded?", response: "Ivo says the reel contains cadences no one has claimed. The people who hear it may recognize themselves too quickly." },
+      { id: "voice-warning", label: "Why was the west label changed?", question: "Why was the west label changed?", response: "Ivo thinks the label describes where to listen, not where the recording belongs." },
+      { id: "voice-boundary", label: "What should never be copied?", question: "What should never be copied?", response: "Ivo refuses to duplicate an uninvited voice. Consent, even across years, is part of his archive." },
     ],
     actions: [
       {
@@ -229,6 +240,11 @@ export const archiveCases: ArchiveCase[] = [
       { label: "Ask Nera to trust you", actionId: "nera-trust" },
       { label: "Break the seal", actionId: "break-seal" },
     ],
+    interviewTopics: [
+      { id: "address-date", label: "Why does tomorrow have a postmark?", question: "Why does tomorrow have a postmark?", response: "Nera sees a date that may describe intention rather than travel. She has marked it as arrival, not proof." },
+      { id: "address-reader", label: "Who owns an unread letter?", question: "Who owns an unread letter?", response: "Nera believes an undelivered letter can belong to the person named by the writer or to no one yet." },
+      { id: "address-limit", label: "What boundary would you keep?", question: "What boundary would you keep?", response: "Nera would preserve the seal unless the writer's need is written clearly enough to change her mind." },
+    ],
     actions: [
       {
         id: "postmark",
@@ -317,6 +333,11 @@ export const archiveCases: ArchiveCase[] = [
       { label: "Map the dust", actionId: "dust-map" },
       { label: "Ask Tovin to guide you", actionId: "tovin-guide" },
       { label: "Follow it in the dark", actionId: "follow-shelf" },
+    ],
+    interviewTopics: [
+      { id: "shelf-pattern", label: "How does the shelf move?", question: "How does the shelf move?", response: "Tovin says the shelf follows a route only when someone stops looking directly at it." },
+      { id: "shelf-trace", label: "What does the dust prove?", question: "What does the dust prove?", response: "The dust proves only that something occupied three places. Tovin refuses to let the trace decide which one was real." },
+      { id: "shelf-map", label: "Should a map fix it in place?", question: "Should a map fix it in place?", response: "Tovin would rather make a map of paths than claim any room is permanent." },
     ],
     actions: [
       {
@@ -407,6 +428,11 @@ export const archiveCases: ArchiveCase[] = [
       { label: "Ask Mara what is missing", actionId: "mara-trust" },
       { label: "Open the forgotten book", actionId: "open-book" },
     ],
+    interviewTopics: [
+      { id: "lamp-watcher", label: "Who keeps the lamp lit?", question: "Who keeps the lamp lit?", response: "Mara says it has outlasted every duty roster. She stopped asking whether the light is a person or an obligation." },
+      { id: "lamp-deadline", label: "Is morning a deadline?", question: "Is morning a deadline?", response: "Mara thinks morning ends a vigil only if the record accepts that ending." },
+      { id: "lamp-reminder", label: "What must not be forgotten?", question: "What must not be forgotten?", response: "Mara wants the forgotten reader remembered even if the archive cannot recover a name." },
+    ],
     actions: [
       {
         id: "lamp-ledger",
@@ -495,6 +521,11 @@ export const archiveCases: ArchiveCase[] = [
       { label: "Compare the blank entries", actionId: "blank-index" },
       { label: "Ask Eren to leave a choice", actionId: "eren-trust" },
       { label: "Read the live index", actionId: "read-index" },
+    ],
+    interviewTopics: [
+      { id: "index-author", label: "Who is writing ahead?", question: "Who is writing ahead?", response: "Eren cannot prove whether the index predicts, remembers, or asks to be answered." },
+      { id: "index-failure", label: "Can an unfinished story fail?", question: "Can an unfinished story fail?", response: "Eren believes failure belongs to an owner. An unfinished record belongs to every reader who might return." },
+      { id: "index-next", label: "What should the next shift inherit?", question: "What should the next shift inherit?", response: "Eren wants the next shift to inherit a choice, not a command disguised as an ending." },
     ],
     actions: [
       {

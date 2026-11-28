@@ -1,10 +1,16 @@
 import { archiveCases } from "../content/cases";
 import { ARCHIVE_MAP_HEIGHT, ARCHIVE_MAP_WIDTH } from "./archiveMap";
-import type { Profile, RunState, Scene } from "./types";
+import { shiftOrders, type Profile, type RunState, type Scene, type ShiftOrderId } from "./types";
 
-const STORAGE_KEY = "night-shift-archive.v2";
-const LEGACY_STORAGE_KEY = "night-shift-archive.v1";
-const SAVE_VERSION = 2;
+const STORAGE_KEY = "night-shift-archive.v4";
+const LEGACY_STORAGE_KEYS = [
+  "night-shift-archive.v3",
+  "night-shift-archive.v2",
+  "night-shift-archive.v1",
+];
+const SAVE_VERSION = 4;
+const previousSaveVersions = [2, 3];
+const shiftOrderIds = new Set<string>(shiftOrders.map((order) => order.id));
 const caseIds = new Set(archiveCases.map((archiveCase) => archiveCase.id));
 const npcIds = new Set(archiveCases.map((archiveCase) => archiveCase.characterId));
 const clueIds = new Set(archiveCases.flatMap((archiveCase) =>
@@ -29,6 +35,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isShiftOrderId(value: unknown): value is ShiftOrderId {
+  return typeof value === "string" && shiftOrderIds.has(value);
 }
 
 function isValidSavedRun(value: unknown): boolean {
@@ -64,6 +74,12 @@ function isValidSavedRun(value: unknown): boolean {
           cell >= 0 && cell < ARCHIVE_MAP_WIDTH * ARCHIVE_MAP_HEIGHT,
         ))) &&
     (value.mapMessage === undefined || value.mapMessage === null || typeof value.mapMessage === "string") &&
+    (value.interviewedTopics === undefined || isStringArray(value.interviewedTopics)) &&
+    (value.selectedInterviewId === undefined || value.selectedInterviewId === null || typeof value.selectedInterviewId === "string") &&
+    (value.shiftOrder === undefined || value.shiftOrder === null || isShiftOrderId(value.shiftOrder)) &&
+    (value.shiftOrderUsed === undefined || typeof value.shiftOrderUsed === "boolean") &&
+    (value.briefingComplete === undefined || typeof value.briefingComplete === "boolean") &&
+    (value.entryTimePaid === undefined || typeof value.entryTimePaid === "boolean") &&
     (value.outcome === undefined || value.outcome === null || typeof value.outcome === "string") &&
     (value.endReason === undefined || value.endReason === null || typeof value.endReason === "string");
 }
@@ -159,6 +175,23 @@ function readRun(value: unknown): RunState | null {
         )
       : [],
     mapMessage: typeof value.mapMessage === "string" ? value.mapMessage : null,
+    interviewedTopics: Array.isArray(value.interviewedTopics)
+      ? [...new Set(value.interviewedTopics.filter((item): item is string => typeof item === "string"))]
+      : [],
+    selectedInterviewId:
+      typeof value.selectedInterviewId === "string"
+        ? value.selectedInterviewId
+        : null,
+    shiftOrder: isShiftOrderId(value.shiftOrder)
+      ? value.shiftOrder
+      : null,
+    shiftOrderUsed: typeof value.shiftOrderUsed === "boolean" ? value.shiftOrderUsed : false,
+    briefingComplete:
+      typeof value.briefingComplete === "boolean" ? value.briefingComplete : true,
+    entryTimePaid:
+      typeof value.entryTimePaid === "boolean"
+        ? value.entryTimePaid
+        : Boolean(value.activeCaseId),
     outcome: typeof value.outcome === "string" ? value.outcome : null,
     endReason: typeof value.endReason === "string" ? value.endReason : null,
   };
@@ -222,6 +255,12 @@ function readProfile(value: unknown, id: number): Profile {
       mapPosition: null,
       mapExplored: [],
       mapMessage: null,
+      interviewedTopics: [],
+      selectedInterviewId: null,
+      shiftOrder: null,
+      shiftOrderUsed: false,
+      briefingComplete: true,
+      entryTimePaid: false,
     };
   }
   if (
@@ -243,6 +282,12 @@ function readProfile(value: unknown, id: number): Profile {
       mapPosition: null,
       mapExplored: [],
       mapMessage: null,
+      interviewedTopics: [],
+      selectedInterviewId: null,
+      shiftOrder: null,
+      shiftOrderUsed: false,
+      briefingComplete: true,
+      entryTimePaid: false,
     };
   }
   let migratedChapter = 1;
@@ -313,7 +358,10 @@ function readVersionedSave(raw: string, sourceKey: string): ProfilesLoadResult {
   if (!isRecord(parsed)) {
     return recover(raw, sourceKey, "The save has an unsupported structure.");
   }
-  if (parsed.version !== SAVE_VERSION) {
+  const isCurrentVersion = parsed.version === SAVE_VERSION;
+  const isSupportedPreviousVersion =
+    typeof parsed.version === "number" && previousSaveVersions.includes(parsed.version);
+  if (!isCurrentVersion && !isSupportedPreviousVersion) {
     return recover(
       raw,
       sourceKey,
@@ -324,34 +372,46 @@ function readVersionedSave(raw: string, sourceKey: string): ProfilesLoadResult {
   if (!profiles) {
     return recover(raw, sourceKey, "One or more saved profiles are malformed.");
   }
+  if (isSupportedPreviousVersion) {
+    const migrated = saveProfiles(profiles);
+    return { profiles, recovery: null, persistenceError: !migrated };
+  }
   return { profiles, recovery: null, persistenceError: false };
 }
 
 export function loadProfiles(): ProfilesLoadResult {
   let currentRaw: string | null;
-  let legacyRaw: string | null;
+  let migrationCandidate: { key: string; raw: string } | null = null;
   try {
     currentRaw = localStorage.getItem(STORAGE_KEY);
-    legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw !== null && migrationCandidate === null) {
+        migrationCandidate = { key, raw };
+      }
+    }
   } catch (error) {
     console.warn("Could not read saved archive data.", error);
     return { profiles: emptyProfiles(), recovery: null, persistenceError: true };
   }
 
   if (currentRaw !== null) return readVersionedSave(currentRaw, STORAGE_KEY);
-  if (legacyRaw === null) {
-    return { profiles: emptyProfiles(), recovery: null, persistenceError: false };
-  }
+  if (migrationCandidate === null) return { profiles: emptyProfiles(), recovery: null, persistenceError: false };
 
   let parsedLegacy: unknown;
   try {
-    parsedLegacy = JSON.parse(legacyRaw);
+    parsedLegacy = JSON.parse(migrationCandidate.raw);
   } catch {
-    return recover(legacyRaw, LEGACY_STORAGE_KEY, "The saved data is not valid JSON.");
+    return recover(migrationCandidate.raw, migrationCandidate.key, "The saved data is not valid JSON.");
   }
-  const legacyProfiles = profilesFrom(parsedLegacy);
+  const legacyData = isRecord(parsedLegacy) &&
+      typeof parsedLegacy.version === "number" &&
+      previousSaveVersions.includes(parsedLegacy.version)
+    ? parsedLegacy.profiles
+    : parsedLegacy;
+  const legacyProfiles = profilesFrom(legacyData);
   if (!legacyProfiles) {
-    return recover(legacyRaw, LEGACY_STORAGE_KEY, "The legacy save is malformed and was left untouched.");
+    return recover(migrationCandidate.raw, migrationCandidate.key, "The legacy save is malformed and was left untouched.");
   }
   const migrated = saveProfiles(legacyProfiles);
   return { profiles: legacyProfiles, recovery: null, persistenceError: !migrated };

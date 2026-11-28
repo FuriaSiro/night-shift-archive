@@ -389,9 +389,11 @@ export function renderDialoguePanel(beat: DialogueBeat, profileId: number): stri
   const options = (Object.keys(SPEEDS) as DialogueSpeed[]).map((speed) =>
     `<option value="${speed}" ${settings.speed === speed ? "selected" : ""}>${speed[0].toUpperCase()}${speed.slice(1)}</option>`,
   ).join("");
-  const reducedMotionNote = prefersReducedMotion()
-    ? `<small class="dialogue-setting-note">Reduced motion: instant text</small>`
-    : "";
+  const speedNote = prefersReducedMotion()
+    ? "Reduced motion is on; text appears instantly."
+    : settings.speed === "instant"
+      ? "Instant text is on."
+      : "Choose Instant to stop the typewriter.";
   const viewLabel = historyIndex >= 0
     ? `<button class="text-button dialogue-current" data-action="dialogue-current">Return to current line</button>`
     : "";
@@ -403,13 +405,16 @@ export function renderDialoguePanel(beat: DialogueBeat, profileId: number): stri
         <p class="eyebrow">${escapeHtml(displayed.trigger)}</p>
         <strong>${escapeHtml(displayed.speaker)}</strong>
       </div>
-      <div class="dialogue-controls">
-        <button class="dialogue-control" data-action="dialogue-sfx" aria-pressed="${settings.sfx}" aria-label="Toggle dialogue sound effects">SFX ${settings.sfx ? "On" : "Off"}</button>
-        <label class="dialogue-speed-label">Text
-          <select data-dialogue-speed aria-label="Dialogue text speed">${options}</select>
-        </label>
-        <button class="dialogue-control" data-action="dialogue-auto" aria-pressed="${settings.auto}" aria-label="Toggle automatic dialogue reading">Auto ${settings.auto ? "On" : "Off"}</button>
-        <button class="dialogue-control" data-action="dialogue-log-open" aria-haspopup="dialog">Log (${history.length})</button>
+      <div class="dialogue-header-tools">
+        <div class="dialogue-controls">
+          <button class="dialogue-control" data-action="dialogue-sfx" aria-pressed="${settings.sfx}" aria-label="Toggle dialogue sound effects">SFX ${settings.sfx ? "On" : "Off"}</button>
+          <label class="dialogue-speed-label">Text
+            <select data-dialogue-speed aria-label="Dialogue text speed">${options}</select>
+          </label>
+          <button class="dialogue-control" data-action="dialogue-auto" aria-pressed="${settings.auto}" aria-label="Toggle automatic dialogue reading">Auto ${settings.auto ? "On" : "Off"}</button>
+          <button class="dialogue-control" data-action="dialogue-log-open" aria-haspopup="dialog">Log (${history.length})</button>
+        </div>
+        <small class="dialogue-setting-note">${speedNote}</small>
       </div>
     </header>
     <button class="dialogue-stage" data-action="dialogue-advance" aria-label="${escapeHtml(displayed.speaker)}: ${escapeHtml(text)} ${isTyping ? "Activate to show the full line." : "Activate to focus the next choice."}">
@@ -425,7 +430,6 @@ export function renderDialoguePanel(beat: DialogueBeat, profileId: number): stri
       ${viewLabel}
       <span class="dialogue-hint">${isTyping ? "Click or press Space to finish" : "Click to focus a choice"}</span>
     </footer>
-    ${reducedMotionNote}
   </section>
   <dialog id="dialogue-log" class="dialogue-log" aria-labelledby="dialogue-log-title">
     <header class="dialogue-log-header">

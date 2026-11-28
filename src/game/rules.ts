@@ -18,6 +18,12 @@ export function newRun(): RunState {
     mapPosition: null,
     mapExplored: [],
     mapMessage: null,
+    interviewedTopics: [],
+    selectedInterviewId: null,
+    shiftOrder: null,
+    shiftOrderUsed: false,
+    briefingComplete: false,
+    entryTimePaid: false,
     outcome: null,
     endReason: null,
   };
@@ -45,6 +51,13 @@ export function getActionCost(run: RunState, action: CaseAction): CaseAction["co
   const plannedApproach = archiveCase?.approaches.find((approach) => approach.label === run.approach);
   if (plannedApproach?.actionId === action.id) {
     cost.time = Math.max(0, (cost.time ?? 0) - 1);
+  }
+  if (
+    run.shiftOrder === "quiet-watch" &&
+    !run.shiftOrderUsed &&
+    (cost.composure ?? 0) > 0
+  ) {
+    cost.composure = Math.max(0, (cost.composure ?? 0) - 1);
   }
   return cost;
 }
@@ -85,6 +98,14 @@ export function applyAction(profile: Profile, run: RunState, action: CaseAction)
   if (!activeAction) return false;
   payCost(run, getActionCost(run, activeAction));
   run.time = Math.min(5, run.time + (activeAction.timeRefund ?? 0));
+  if (
+    run.shiftOrder === "quiet-watch" &&
+    !run.shiftOrderUsed &&
+    (activeAction.cost.composure ?? 0) > 0
+  ) {
+    run.shiftOrderUsed = true;
+    run.history.push("The quiet watch reduced the first risky lead's Composure cost by 1.");
+  }
   if (!run.clues.includes(activeAction.clue)) run.clues.push(activeAction.clue);
   run.inspectionActionId = null;
   run.inspectionFeedback = null;
@@ -107,6 +128,9 @@ export function finishShift(run: RunState, reason: string): void {
   run.mapPosition = null;
   run.mapExplored = [];
   run.mapMessage = null;
+  run.interviewedTopics = [];
+  run.selectedInterviewId = null;
+  run.entryTimePaid = false;
 }
 
 export function checkFailure(run: RunState): string | null {
